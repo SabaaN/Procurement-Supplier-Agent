@@ -11,7 +11,7 @@ class SearchState(TypedDict, total=False):
     past_queries: list[str]  # every query planned so far, so retries don't repeat them
     urls: list[str]  # every unique URL found so far (grows across attempts)
     hits: list[dict]  # {url, title, snippet, score, query} for each URL
-    pages: list[dict]  # {"url": ..., "text": ...}
+    pages: list[dict]  # {url, title, ok, text, error} for every page tried (grows across attempts)
     products: list[dict]  # extracted, device spec model dumped to dict
     candidates: list[dict]  # products that survived the filter
     dropped: list[dict]  # products removed by the filter, with reasons

@@ -1,11 +1,11 @@
-"""Shared fixtures. Every test runs with Groq and Tavily faked, so no test touches the network."""
+"""Shared fixtures. Every test runs with Groq, Tavily and page fetching faked, and a temp cache DB."""
 import pytest
 
-from app.services import query_planner, web_search
+from app.services import cache, page_fetcher, query_planner, web_search
 
 
 @pytest.fixture(autouse=True)
-def fake_services(monkeypatch):
+def fake_services(monkeypatch, tmp_path):
     def fake_plan(device_key, criteria, attempt, previous=()):
         # 1 query on the first attempt, 2 on later ones (broader)
         n = 1 if attempt == 1 else 2
@@ -18,5 +18,10 @@ def fake_services(monkeypatch):
             for i in range(3)
         ]
 
+    def fake_fetch(url, client=None):
+        return page_fetcher.FetchResult(url, True, text="stub page text " * 20)
+
     monkeypatch.setattr(query_planner, "plan", fake_plan)
     monkeypatch.setattr(web_search, "search_web", fake_search)
+    monkeypatch.setattr(page_fetcher, "fetch_page", fake_fetch)
+    monkeypatch.setattr(cache, "_db_path", lambda: tmp_path / "test.db")

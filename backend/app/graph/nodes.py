@@ -10,6 +10,10 @@ from .progress import emit
 from .state import SearchState
 from ..services import query_planner, web_search
 from .checks import check_product
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+from ..config import settings
+from ..services import cache, page_fetcher, query_planner, web_search
 
 MIN_RESULTS = 5  # fewer survivors than this -> plan broader queries
 MAX_ATTEMPTS = 3  # never loop more than this many times
@@ -88,16 +92,49 @@ def search(state: SearchState) -> dict:
     return {"urls": urls, "hits": hits}
 
 
-def fetch_clean(state: SearchState) -> dict:  # STUB
-    pages = [{"url": u, "text": "stub page text"} for u in state["urls"]]
+def fetch_clean(state: SearchState) -> dict:
+    """Download and clean up to N pages we haven't tried yet. Cached results skip the network."""
+    pages = list(state.get("pages", []))
+    tried = {p["url"] for p in pages}
+    titles = {h["url"]: h.get("title", "") for h in state.get("hits", [])}
+    todo = [u for u in state.get("urls", []) if u not in tried][: settings.max_pages_per_attempt]
+    if not todo:
+        emit("extract", "done", "No new pages to read")
+        return {"pages": pages}
+
+    results, to_fetch = {}, []
+    for url in todo:
+        cached = cache.get_page(url)
+        if cached:
+            results[url] = cached
+        else:
+            to_fetch.append(url)
+
+    done = len(results)
+    if to_fetch:
+        with ThreadPoolExecutor(max_workers=settings.fetch_workers) as pool:
+            futures = [pool.submit(page_fetcher.fetch_page, u) for u in to_fetch]
+            for fut in as_completed(futures):
+                r = fut.result()  # fetch_page never raises
+                if r.ok or r.error != "timeout":  # timeouts are often temporary: don't cache them
+                    cache.put_page(r.url, r.ok, r.text, r.error)
+                results[r.url] = {"url": r.url, "ok": r.ok, "text": r.text, "error": r.error}
+                done += 1
+                emit("extract", "running", f"Reading {done} of {len(todo)} pages", done=done, total=len(todo))
+
+    for url in todo:
+        pages.append({**results[url], "title": titles.get(url, "")})
+    ok = sum(1 for url in todo if results[url]["ok"])
+    emit("extract", "running", f"Fetched {ok} of {len(todo)} pages ({len(todo) - ok} unreachable)")
     return {"pages": pages}
 
 
-def extract(state: SearchState) -> dict:  # STUB
+def extract(state: SearchState) -> dict:  # STUB (real Groq extraction is the next step)
     device = get_device(state["device_type"])
+    pages = [p for p in state["pages"] if p["ok"]]  # skip pages that failed to download
     products = []
-    for i, page in enumerate(state["pages"]):
-        emit("extract", "running", f"Reading {i + 1} of {len(state['pages'])} pages", done=i + 1, total=len(state["pages"]))
+    for i, page in enumerate(pages):
+        emit("extract", "running", f"Reading {i + 1} of {len(pages)} pages", done=i + 1, total=len(pages))
         products.append(device.stub_spec(i, page["url"]).model_dump(mode="json"))
     emit("extract", "done", f"Extracted {len(products)} products")
     return {"products": products}

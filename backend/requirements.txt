@@ -1,3 +1,6 @@
 langgraph>=0.6
+langchain-groq>=0.3.8
+tavily-python>=0.5
+python-dotenv>=1.0
 pydantic>=2.7
 pytest>=8.0

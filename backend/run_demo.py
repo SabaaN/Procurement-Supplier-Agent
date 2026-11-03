@@ -25,11 +25,13 @@ inputs = {
 }
 
 # "custom" mode delivers the progress events our nodes emit.
-for mode, event in graph.stream(inputs, config, stream_mode=["custom"], subgraphs=False):
+for *_, event in graph.stream(inputs, config, stream_mode=["custom"], subgraphs=True):
     print(f"[{event['step']:<8}] {event['status']:<7} {event['message']}")
 
 final = graph.get_state(config).values
 print("\nerror:", final.get("error"))
 print("attempts:", final.get("attempts"))
+print("queries tried:", *final.get("past_queries", []), sep="\n  ")
+print(f"urls found: {len(final.get('urls', []))}")
 for p in final.get("ranked", []):
-    print(f"  {p['title']:<16} {p['price']:>8} {p['currency']}  {p['megapixels']} MP  score={p['match_score']}")
+    print(f"  {p['title']:<16} {p['price']:>8} {p['currency']}  {p['source_url']}")

@@ -9,9 +9,9 @@ from app.graph.build import build_graph  # noqa: E402
 def run(raw, device="camera"):
     graph = build_graph()
     config = {"configurable": {"thread_id": "t1"}}
-    events = [e for _, e in graph.stream(
+    events = [chunk[-1] for chunk in graph.stream(
         {"search_id": "t1", "device_type": device, "raw_criteria": raw},
-        config, stream_mode=["custom"], subgraphs=False,
+        config, stream_mode=["custom"], subgraphs=True,
     )]
     return graph.get_state(config).values, events
 

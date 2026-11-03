@@ -8,6 +8,8 @@ from pydantic import ValidationError
 from ..devices import UnsupportedDevice, get_device
 from .progress import emit
 from .state import SearchState
+from ..services import query_planner, web_search
+from .checks import check_product
 
 MIN_RESULTS = 5  # fewer survivors than this -> plan broader queries
 MAX_ATTEMPTS = 3  # never loop more than this many times
@@ -49,21 +51,41 @@ def finalize(state: SearchState) -> dict:
 
 # ---------- device subgraph (shared by every device) ----------
 
-def plan_queries(state: SearchState) -> dict:  # STUB
+def plan_queries(state: SearchState) -> dict:
+    """Groq writes the queries (template fallback if it fails). Later attempts go broader."""
     attempt = state.get("attempts", 0) + 1
-    device = get_device(state["device_type"])
     emit("search", "running", f"Planning search queries (attempt {attempt})")
-    queries = [f"buy {device.label.lower()} industrial"]
-    if attempt == 1:
-        queries.append(f"{device.label.lower()} with all required specs")
-    return {"queries": queries, "attempts": attempt}
+    past = state.get("past_queries", [])
+    queries, source = query_planner.plan(state["device_type"], state["criteria"], attempt, past)
+    note = "" if source == "llm" else f" ({source})"
+    emit("search", "running", f"Planned {len(queries)} queries{note}")
+    return {"queries": queries, "past_queries": [*past, *queries], "attempts": attempt}
 
 
-def search(state: SearchState) -> dict:  # STUB
-    n = 3 if state["attempts"] == 1 else 8  # broader queries find more pages
-    urls = [f"https://example.com/{state['device_type']}/{i}" for i in range(n)]
-    emit("search", "done", f"Found {len(urls)} pages", done=len(urls), total=len(urls))
-    return {"urls": urls}
+def search(state: SearchState) -> dict:
+    """Run each planned query on Tavily; keep only URLs we haven't seen in earlier attempts."""
+    urls = list(state.get("urls", []))
+    hits = list(state.get("hits", []))
+    known = set(urls)
+    errors = []
+    for q in state.get("queries", []):
+        try:
+            results = web_search.search_web(q)
+        except web_search.SearchError as e:
+            errors.append(str(e))
+            continue
+        for r in results:
+            if r["url"] not in known:
+                known.add(r["url"])
+                urls.append(r["url"])
+                hits.append({**r, "query": q})
+
+    new = len(urls) - len(state.get("urls", []))
+    if errors and len(errors) == len(state.get("queries", [])):
+        emit("search", "failed", f"Search failed: {errors[0]}")
+        return {"urls": urls, "hits": hits, "error": f"Search failed: {errors[0]}"}
+    emit("search", "done", f"Found {new} new pages ({len(urls)} total)", done=len(urls), total=len(urls))
+    return {"urls": urls, "hits": hits}
 
 
 def fetch_clean(state: SearchState) -> dict:  # STUB
@@ -82,24 +104,41 @@ def extract(state: SearchState) -> dict:  # STUB
 
 
 def filter_products(state: SearchState) -> dict:
-    """Python filter. Only the budget check so far; required-spec checks come next step."""
+    """Python filter: budget first, then every requirement the buyer set."""
     c = state["criteria"]
     lo, hi = c.get("budget_min"), c.get("budget_max")
-    kept = []
+    kept, dropped = [], []
     for p in state["products"]:
         price = p.get("price")
+        if price is not None and not ((lo is None or price >= lo) and (hi is None or price <= hi)):
+            dropped.append({"title": p.get("title"), "reasons": ["Price outside budget"]})
+            continue
+
+        verdict = check_product(c, p)
+        if verdict["dropped_for"]:
+            dropped.append({"title": p.get("title"), "reasons": verdict["dropped_for"]})
+            continue
+
+        flags = list(p.get("flags", []))
         if price is None:
-            kept.append({**p, "flags": [*p.get("flags", []), "price_missing"]})
-        elif (lo is None or price >= lo) and (hi is None or price <= hi):
-            kept.append(p)
-    emit("filter", "done", f"{len(kept)} of {len(state['products'])} products kept", done=len(kept), total=len(state["products"]))
-    return {"candidates": kept}
+            flags.append("price_missing")
+        flags += [f"{label}: not found on page" for label in verdict["unknown"]]
+        kept.append({
+            **p,
+            "requirements_met": verdict["met"],
+            "requirements_missed": verdict["missed"],
+            "flags": flags,
+        })
+
+    emit("filter", "done", f"{len(kept)} of {len(state['products'])} products kept",
+         done=len(kept), total=len(state["products"]))
+    return {"candidates": kept, "dropped": dropped}
 
 
 def route_after_filter(state: SearchState) -> str:
     """Too few survivors -> plan broader queries, unless we've already tried enough."""
-    if len(state["candidates"]) >= MIN_RESULTS or state["attempts"] >= MAX_ATTEMPTS:
-        return "score"
+    if state.get("error") or len(state["candidates"]) >= MIN_RESULTS or state["attempts"] >= MAX_ATTEMPTS:
+        return "score"  # also stop when a step failed outright (e.g. Tavily key missing)
     return "plan_queries"
 
 

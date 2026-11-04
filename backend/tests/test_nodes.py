@@ -71,3 +71,12 @@ def test_finalize_sorts_by_score_then_price():
         ]
     }
     assert [p["title"] for p in nodes.finalize(state)["ranked"]] == ["b", "c", "a"]
+
+def run_device_pipeline(state: dict) -> dict:
+    """What the device subgraph does, written as a plain loop."""
+    while True:
+        for step in (nodes.plan_queries, nodes.search, nodes.fetch_clean, nodes.extract,
+                     nodes.convert_prices, nodes.filter_products):
+            state = {**state, **step(state)}
+        if nodes.route_after_filter(state) == "score":
+            return {**state, **nodes.score(state)}

@@ -9,19 +9,13 @@ from ..devices import DEVICES
 from . import nodes
 from .state import SearchState
 
-
 def build_device_subgraph(device_key: str):
-    """plan_queries -> search -> fetch_clean -> extract -> filter -> score,
-    looping back to plan_queries when too few products survive the filter.
-
-    The nodes read the device from state, so every device reuses them. When a device needs
-    its own step (e.g. NVR compatibility for cameras), add a node here for that key only.
-    """
     g = StateGraph(SearchState)
     g.add_node("plan_queries", nodes.plan_queries)
     g.add_node("search", nodes.search)
     g.add_node("fetch_clean", nodes.fetch_clean)
     g.add_node("extract", nodes.extract)
+    g.add_node("convert_prices", nodes.convert_prices)
     g.add_node("filter", nodes.filter_products)
     g.add_node("score", nodes.score)
 
@@ -29,7 +23,8 @@ def build_device_subgraph(device_key: str):
     g.add_edge("plan_queries", "search")
     g.add_edge("search", "fetch_clean")
     g.add_edge("fetch_clean", "extract")
-    g.add_edge("extract", "filter")
+    g.add_edge("extract", "convert_prices")
+    g.add_edge("convert_prices", "filter")
     g.add_conditional_edges("filter", nodes.route_after_filter, {"score": "score", "plan_queries": "plan_queries"})
     g.add_edge("score", END)
     return g.compile()

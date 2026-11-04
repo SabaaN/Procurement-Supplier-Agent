@@ -34,4 +34,14 @@ print("attempts:", final.get("attempts"))
 print("queries tried:", *final.get("past_queries", []), sep="\n  ")
 print(f"urls found: {len(final.get('urls', []))}")
 for p in final.get("ranked", []):
-    print(f"  {p['title']:<16} {p['price']:>8} {p['currency']}  {p['source_url']}")
+    cur = p.get("currency") or ""
+    price = f"{p['price']:,.2f} {cur}" if p.get("price") is not None else "price n/a"
+    if p.get("fx_rate"):
+        price += f"  (= {p['price_buyer']:,.0f} PKR at {p['fx_rate']})"
+    print(f"\n{p['title'][:60]}   score {p['match_score']}  {p['score_breakdown']}")
+    print(f"  {price} | {p.get('megapixels')} MP | {p.get('fps')} fps | {p.get('shutter')} shutter | {p.get('interface')}")
+    if p.get("total_cost") is not None:
+        print(f"  total for {inputs['raw_criteria']['quantity']}: {p['total_cost']:,.0f} PKR (excl. shipping and duties)")
+    print(f"  met: {p['requirements_met']}  missed: {p['requirements_missed']}")
+    print(f"  flags: {p['flags']}")
+    print(f"  {p['source_url']}")

@@ -11,9 +11,10 @@ from .state import SearchState
 from ..services import query_planner, web_search
 from .checks import check_product
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
 from ..config import settings
-from ..services import cache, page_fetcher, query_planner, web_search
+from ..services import cache, extractor, page_fetcher, query_planner, web_search
+from ..services import cache, extractor, fx, page_fetcher, query_planner, web_search
+from . import scoring
 
 MIN_RESULTS = 5  # fewer survivors than this -> plan broader queries
 MAX_ATTEMPTS = 3  # never loop more than this many times
@@ -129,36 +130,93 @@ def fetch_clean(state: SearchState) -> dict:
     return {"pages": pages}
 
 
-def extract(state: SearchState) -> dict:  # STUB (real Groq extraction is the next step)
-    device = get_device(state["device_type"])
+def extract(state: SearchState) -> dict:
+    """Groq reads each fetched page. Results (including 'not a product page') are cached by URL."""
+    device_key = state["device_type"]
     pages = [p for p in state["pages"] if p["ok"]]  # skip pages that failed to download
-    products = []
-    for i, page in enumerate(pages):
-        emit("extract", "running", f"Reading {i + 1} of {len(pages)} pages", done=i + 1, total=len(pages))
-        products.append(device.stub_spec(i, page["url"]).model_dump(mode="json"))
-    emit("extract", "done", f"Extracted {len(products)} products")
+    products, skipped, failed, last_error = [], 0, 0, ""
+    for i, page in enumerate(pages, 1):
+        emit("extract", "running", f"Extracting specs from page {i} of {len(pages)}", done=i, total=len(pages))
+        cached = cache.get_extraction(page["url"], device_key)
+        if cached is not None:
+            product = cached["product"]
+        else:
+            try:
+                product = extractor.extract_product(device_key, page["url"], page.get("title", ""), page["text"])
+            except extractor.ExtractionError as e:
+                failed, last_error = failed + 1, str(e)
+                continue  # not cached, so a later attempt can retry it
+            cache.put_extraction(page["url"], device_key, product)
+        if product is None:
+            skipped += 1
+        else:
+            products.append(product)
+
+    if pages and failed == len(pages):  # the model never worked: stop instead of looping
+        emit("extract", "failed", f"Extraction failed: {last_error}")
+        return {"products": [], "error": f"Extraction failed: {last_error}"}
+    emit("extract", "done", f"{len(products)} products extracted ({skipped} not product pages, {failed} failed)")
     return {"products": products}
 
+def convert_prices(state: SearchState) -> dict:
+    """Put each price in the buyer's currency and work out the cost for the requested quantity."""
+    c = state["criteria"]
+    buyer_cur, qty = c.get("currency"), c.get("quantity", 1)
+    out = []
+    for p in state["products"]:
+        price, cur = p.get("price"), p.get("currency")
+        flags = list(p.get("flags", []))
+        price_buyer, rate = None, None
+        if price is not None:
+            if not cur or not buyer_cur or cur == buyer_cur:
+                price_buyer = price  # same currency, or unknown (the filter flags that case)
+            else:
+                rate = fx.get_rate(cur, buyer_cur)
+                price_buyer = round(price * rate, 2) if rate else None
+        moq = p.get("moq")
+        if moq and qty < moq:
+            flags.append(f"MOQ {moq} is above your quantity {qty}")
+        out.append({
+            **p,
+            "price_buyer": price_buyer,
+            "fx_rate": round(rate, 4) if rate else None,
+            "total_cost": round(price_buyer * qty, 2) if price_buyer is not None else None,
+            "flags": flags,
+        })
+    emit("filter", "running", f"Checked prices against your budget in {buyer_cur or 'its own currency'}")
+    return {"products": out}
 
 def filter_products(state: SearchState) -> dict:
-    """Python filter: budget first, then every requirement the buyer set."""
+    """Python filter: budget (in the buyer's currency), then every requirement the buyer set."""
     c = state["criteria"]
     lo, hi = c.get("budget_min"), c.get("budget_max")
+    buyer_cur = c.get("currency")
     kept, dropped = [], []
     for p in state["products"]:
-        price = p.get("price")
-        if price is not None and not ((lo is None or price >= lo) and (hi is None or price <= hi)):
-            dropped.append({"title": p.get("title"), "reasons": ["Price outside budget"]})
-            continue
+        flags = list(p.get("flags", []))
+        price, cur = p.get("price"), p.get("currency")
+        # Price in the buyer's currency. convert_prices sets it; this is the fallback if it didn't run.
+        if "price_buyer" in p:
+            price_buyer = p["price_buyer"]
+        else:
+            price_buyer = price if (not cur or not buyer_cur or cur == buyer_cur) else None
+
+        if price is None:
+            flags.append("price_missing")
+        elif price_buyer is None:
+            flags.append(f"price in {cur}: budget not checked (no exchange rate)")
+        else:
+            if cur is None:
+                flags.append("currency_unknown")
+            if (lo is not None and price_buyer < lo) or (hi is not None and price_buyer > hi):
+                dropped.append({"title": p.get("title"), "reasons": ["Price outside budget"]})
+                continue
 
         verdict = check_product(c, p)
         if verdict["dropped_for"]:
             dropped.append({"title": p.get("title"), "reasons": verdict["dropped_for"]})
             continue
 
-        flags = list(p.get("flags", []))
-        if price is None:
-            flags.append("price_missing")
         flags += [f"{label}: not found on page" for label in verdict["unknown"]]
         kept.append({
             **p,
@@ -179,5 +237,6 @@ def route_after_filter(state: SearchState) -> str:
     return "plan_queries"
 
 
-def score(state: SearchState) -> dict:  # STUB
-    return {"candidates": [{**p, "match_score": 50.0} for p in state["candidates"]]}
+def score(state: SearchState) -> dict:
+    """Real scoring: preferences, relative price and data confidence (see scoring.py)."""
+    return {"candidates": scoring.score_products(state["criteria"], state["candidates"])}

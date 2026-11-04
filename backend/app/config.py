@@ -30,6 +30,7 @@ class Settings:
 
     # cache
     cache_ttl_hours: float = 24
+    extract_retry_wait: float = 5.0  # seconds to wait before retrying a failed Groq call
     db_path: Path = BACKEND_DIR / "data" / "app.db"
 
 

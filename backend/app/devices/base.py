@@ -88,5 +88,9 @@ class DeviceDefinition:
     criteria_model: type[SharedCriteria]
     spec_model: type[ProductBase]
     fields: list[FieldDef] = field(default_factory=list)
-    # Temporary: builds a fake product so the graph can run before real extraction exists.
+    # What the LLM fills in from a page (loose strings), and how Python turns that into spec_model fields.
+    extraction_model: type[BaseModel] | None = None
+    extraction_hint: str = ""
+    normalize: Callable[[dict], tuple[dict, list[str]]] | None = None
+    # Used only by tests, to fake products without calling Groq.
     stub_spec: Callable[[int, str], ProductBase] | None = None

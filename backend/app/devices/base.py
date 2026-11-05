@@ -58,6 +58,7 @@ class ProductBase(BaseModel):
     requirements_missed: list[str] = []
     flags: list[str] = []
     match_score: float | None = Field(default=None, ge=0, le=100)
+    explanation: str | None = None  # why it ranked where it did
     price_buyer: float | None = None  # unit price in the buyer's currency
     fx_rate: float | None = None  # exchange rate used, when the price was converted
     total_cost: float | None = None  # price_buyer x quantity (excludes shipping and duties)

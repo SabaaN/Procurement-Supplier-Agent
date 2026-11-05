@@ -1,7 +1,7 @@
 """Shared fixtures. Every test runs with Groq, Tavily, page fetching and extraction faked, and a temp cache DB."""
 import pytest
 from app.devices.camera import CAMERA
-from app.services import cache, extractor, fx, page_fetcher, query_planner, web_search
+from app.services import cache, explainer, extractor, fx, page_fetcher, query_planner, web_search
 
 @pytest.fixture(autouse=True)
 def fake_services(monkeypatch, tmp_path):
@@ -25,6 +25,11 @@ def fake_services(monkeypatch, tmp_path):
     def fake_extract(device_key, url, title, text):
         i = ids.setdefault(url, len(ids))
         return CAMERA.stub_spec(i, url).model_dump(mode="json")
+
+    def no_llm(facts):
+        raise RuntimeError("LLM disabled in tests")
+
+    monkeypatch.setattr(explainer, "_llm_explanations", no_llm) 
 
     monkeypatch.setattr(query_planner, "plan", fake_plan)
     monkeypatch.setattr(web_search, "search_web", fake_search)

@@ -17,6 +17,8 @@ class Settings:
     groq_model_small: str = os.getenv("GROQ_MODEL_SMALL", "llama-3.1-8b-instant")
     max_queries: int = 4  # per attempt; keeps Tavily credits and Groq tokens low
     results_per_query: int = 5
+    groq_model_large: str = os.getenv("GROQ_MODEL_LARGE", "llama-3.3-70b-versatile")
+    explain_top_n: int = 10  # only the top N products are sent to the model for explanations
 
     # page fetching
     max_pages_per_attempt: int = 8  # new pages fetched per search attempt
@@ -32,6 +34,5 @@ class Settings:
     cache_ttl_hours: float = 24
     extract_retry_wait: float = 5.0  # seconds to wait before retrying a failed Groq call
     db_path: Path = BACKEND_DIR / "data" / "app.db"
-
 
 settings = Settings()

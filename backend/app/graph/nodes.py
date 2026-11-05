@@ -12,8 +12,7 @@ from ..services import query_planner, web_search
 from .checks import check_product
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from ..config import settings
-from ..services import cache, extractor, page_fetcher, query_planner, web_search
-from ..services import cache, extractor, fx, page_fetcher, query_planner, web_search
+from ..services import cache, explainer, extractor, fx, page_fetcher, query_planner, web_search
 from . import scoring
 
 MIN_RESULTS = 5  # fewer survivors than this -> plan broader queries
@@ -45,12 +44,18 @@ def route_device(state: SearchState) -> str:
 
 
 def finalize(state: SearchState) -> dict:
+    """Sort by score (cheaper first on ties) and attach a plain-language explanation to each product."""
     emit("rank", "running", "Ranking results")
-    ranked = sorted(
-        state.get("candidates", []),
-        key=lambda p: (-(p.get("match_score") or 0), p.get("price") if p.get("price") is not None else float("inf")),
-    )
-    emit("rank", "done", f"{len(ranked)} products ranked", done=len(ranked), total=len(ranked))
+
+    def sort_key(p):
+        cost = p.get("price_buyer") if p.get("price_buyer") is not None else p.get("price")
+        return (-(p.get("match_score") or 0), cost if cost is not None else float("inf"))
+
+    ranked = sorted(state.get("candidates", []), key=sort_key)
+    texts, source = explainer.explain(state.get("device_type"), state.get("criteria", {}), ranked)
+    ranked = [{**p, "explanation": text} for p, text in zip(ranked, texts)]
+    note = "" if source == "llm" else f" ({source})"
+    emit("rank", "done", f"{len(ranked)} products ranked{note}", done=len(ranked), total=len(ranked))
     return {"ranked": ranked}
 
 

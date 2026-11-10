@@ -1,0 +1,18 @@
+export const KEY_SPECS = {
+  camera: [
+    { key: 'megapixels', format: (v) => `${v} MP` },
+    { key: 'fps', format: (v) => `${v} fps` },
+    { key: 'shutter', format: (v) => `${v} shutter` },
+    { key: 'interface', format: (v) => v.join(' / ') },
+  ],
+}
+
+/** The spec texts to show for one product, skipping anything the page didn't state. */
+export function keySpecs(deviceKey, product) {
+  return (KEY_SPECS[deviceKey] ?? [])
+    .filter((s) => {
+      const v = product[s.key]
+      return v != null && !(Array.isArray(v) && v.length === 0)
+    })
+    .map((s) => s.format(product[s.key]))
+}

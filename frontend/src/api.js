@@ -41,3 +41,7 @@ export const setShortlisted = (id, productId, shortlisted) =>
 
 export const exportUrl = (id, shortlistOnly = false) =>
   `/api/searches/${id}/export.csv${shortlistOnly ? '?shortlist_only=true' : ''}`
+
+export const getSearches = () => request('/api/searches')
+
+export const getSearch = (id) => request(`/api/searches/${id}`)

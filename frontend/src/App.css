@@ -1,3 +1,10 @@
+.page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
 .page {
   display: grid;
   gap: var(--space-5);

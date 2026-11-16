@@ -5,29 +5,39 @@ WEIGHTS = {"preferences": 50, "price": 30, "confidence": 20}
 FLAG_PENALTY = 0.25  # each data-quality flag removes this share of the confidence component
 
 
+CLOSE_CREDIT = 0.5  # a flexible spec that is close counts half
+
+
 def preference_share(criteria: dict, product: dict, checks=CAMERA_CHECKS) -> float | None:
-    """Share of the buyer's preferred (nice-to-have) specs that the page verifiably meets.
-    None when the buyer set no preferences."""
+    """Share of the buyer's flexible and nice-to-have specs that the page verifiably meets
+    (a close flexible spec counts half). None when the buyer set none."""
     labels = [
         label
         for name, (_spec, _compare, label) in checks.items()
-        if (req := criteria.get(name)) and not req["required"]
+        if (req := criteria.get(name)) and (req.get("flexible") or not req["required"])
     ]
     if not labels:
         return None
     met = set(product.get("requirements_met", []))
-    return sum(1 for label in labels if label in met) / len(labels)
+    close = set(product.get("requirements_close", []))
+    return sum(1 if label in met else CLOSE_CREDIT if label in close else 0 for label in labels) / len(labels)
 
 
 def score_products(criteria: dict, products: list[dict], checks=CAMERA_CHECKS) -> list[dict]:
-    """Adds match_score and score_breakdown to each product. Price is scored relative to the others."""
-    prices = [p["price_buyer"] for p in products if p.get("price_buyer") is not None]
+    """Adds match_score and score_breakdown to each product. Price is scored relative to the others.
+    Prices under the buyer's minimum budget count as the minimum: cheaper than the floor earns nothing extra."""
+    floor = criteria.get("budget_min") or 0
+
+    def priced(p):
+        return None if p.get("price_buyer") is None else max(p["price_buyer"], floor)
+
+    prices = [priced(p) for p in products if priced(p) is not None]
     lo, hi = (min(prices), max(prices)) if prices else (0, 0)
 
     scored = []
     for p in products:
         parts = {"preferences": preference_share(criteria, p, checks)}
-        price = p.get("price_buyer")
+        price = priced(p)
         if price is None:
             parts["price"] = 0.0
         elif hi == lo:

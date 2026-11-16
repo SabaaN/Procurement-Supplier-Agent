@@ -19,11 +19,15 @@ class QueryPlan(BaseModel):
 
 
 SYSTEM = (
-    "You write web search queries that find product pages (store listings or datasheets) "
-    "for industrial equipment a buyer wants to purchase. Return 3 to 5 distinct, short queries, "
-    "each written the way a person would type it into a search engine. "
-    "Use only the specs you are given. Never invent specs, models or prices."
+    "You write web search queries that find shop pages where a buyer can see the price of, and buy, "
+    "the industrial equipment they want: product pages and shop category pages from distributors and "
+    "online stores. Do not write queries for datasheets, PDFs, manuals, reviews or news. "
+    "Return 3 to 5 distinct, short queries, each written the way a person would type it into a search "
+    "engine. Use only the specs you are given. Never invent specs, models or prices."
 )
+
+# Where buyers paying in these currencies usually shop, so at least one query finds local sellers.
+LOCAL_MARKET = {"PKR": "Pakistan", "AED": "UAE", "INR": "India", "GBP": "UK", "EUR": "Europe"}
 
 
 def spec_items(device, criteria: dict) -> list[dict]:
@@ -44,43 +48,57 @@ def spec_items(device, criteria: dict) -> list[dict]:
             if f.kind in ("select", "multiselect"):
                 term += f" {f.label.lower()}"
         op = "at least " if f.name.startswith("min_") else ""
+        flexible = bool(req.get("flexible"))
         items.append(
             {
                 "label": f.label,
-                "text": f"{f.label}: {op}{vtxt}{f' {f.unit}' if f.unit else ''}",
+                "text": f"{f.label}: {'about ' if flexible and op else op}{vtxt}{f' {f.unit}' if f.unit else ''}",
                 "term": term,
-                "required": bool(req["required"]),
+                "required": bool(req["required"]) and not flexible,
+                "level": "flexible" if flexible else "must" if req["required"] else "nice",
             }
         )
     return items
 
 
-def fallback_queries(device_label: str, items: list[dict], attempt: int) -> list[str]:
-    """Template queries. Later attempts drop required specs one by one to widen the search."""
-    name = f"industrial {device_label.lower()}"
-    required = [i["term"] for i in items if i["required"] and i["term"]]
-    preferred = [i["term"] for i in items if not i["required"] and i["term"]]
+def fallback_queries(device, items: list[dict], attempt: int, criteria: dict | None = None) -> list[str]:
+    """Template queries. Flexible specs are never in them (so nearby values are found too);
+    later attempts drop must-have specs one by one to widen the search."""
+    name = device.search_term or f"industrial {device.label.lower()}"
+    market = LOCAL_MARKET.get((criteria or {}).get("currency", ""))
+    required = [i["term"] for i in items if i["level"] == "must" and i["term"]]
+    nice = [i["term"] for i in items if i["level"] == "nice" and i["term"]]
     if attempt == 1:
-        terms = " ".join(required or preferred[:2])
-        return [f"{name} {terms} buy", f"{name} {terms} datasheet"]
-    keep = max(1, len(required) - (attempt - 1)) if required else 0
-    terms = " ".join(required[:keep])
-    return [f"{name} {terms} price", f"{device_label.lower()} supplier {terms}"]
+        terms = " ".join(required or nice[:2])
+    else:
+        terms = " ".join(required[: max(1, len(required) - (attempt - 1))] if required else [])
+    queries = [f"{name} {terms} price", f"{name} {terms} buy online"]
+    if market:
+        queries.insert(0, f"{name} {terms} price in {market}")
+    return [" ".join(q.split()) for q in queries]
 
 
-def _prompt(device_label: str, items: list[dict], criteria: dict, attempt: int, previous) -> str:
-    required = [i["text"] for i in items if i["required"]] or ["(none)"]
-    preferred = [i["text"] for i in items if not i["required"]] or ["(none)"]
+def _prompt(device, items: list[dict], criteria: dict, attempt: int, previous) -> str:
+    def group(level):
+        return "\n".join(f"- {i['text']}" for i in items if i["level"] == level) or "- (none)"
+
     lo, hi = criteria.get("budget_min"), criteria.get("budget_max")
+    market = LOCAL_MARKET.get(criteria.get("currency", ""))
     parts = [
-        f"Device: {device_label}",
-        "Required specs:\n" + "\n".join(f"- {t}" for t in required),
-        "Preferred specs:\n" + "\n".join(f"- {t}" for t in preferred),
+        f"Device: {device.label}",
+        device.search_hint,
+        "Required specs:\n" + group("must"),
+        "Flexible specs (the buyer accepts nearby values: do NOT put these numbers in the queries):\n"
+        + group("flexible"),
+        "Preferred specs:\n" + group("nice"),
         f"Budget per unit: {lo if lo is not None else 'any'} to {hi if hi is not None else 'any'} {criteria.get('currency', '')}; "
         f"quantity {criteria.get('quantity', 1)}",
     ]
     if criteria.get("notes"):
         parts.append(f"Buyer notes: {criteria['notes']}")
+    if market:
+        parts.append(f"The buyer is in {market}: make at least one query find shops selling there "
+                     f"(e.g. ending in 'price in {market}').")
     if attempt == 1:
         parts.append("Be specific: include the most important required specs in the queries.")
     else:
@@ -100,11 +118,11 @@ def _llm():
     return ChatGroq(model=settings.groq_model_small, temperature=0.2, max_retries=2)
 
 
-def _llm_queries(device_label, items, criteria, attempt, previous) -> list[str]:
+def _llm_queries(device, items, criteria, attempt, previous) -> list[str]:
     if not settings.groq_api_key:
         raise RuntimeError("GROQ_API_KEY is not set (add it to backend/.env)")
     structured = _llm().with_structured_output(QueryPlan)
-    plan = structured.invoke([("system", SYSTEM), ("human", _prompt(device_label, items, criteria, attempt, previous))])
+    plan = structured.invoke([("system", SYSTEM), ("human", _prompt(device, items, criteria, attempt, previous))])
     return plan.queries
 
 
@@ -125,10 +143,10 @@ def plan(device_key: str, criteria: dict, attempt: int, previous=()) -> tuple[li
     device = get_device(device_key)
     items = spec_items(device, criteria)
     try:
-        queries = _clean(_llm_queries(device.label, items, criteria, attempt, previous), previous)
+        queries = _clean(_llm_queries(device, items, criteria, attempt, previous), previous)
         if not queries:
             raise ValueError("model returned no new queries")
         return queries, "llm"
     except Exception as e:  # any Groq failure: missing key, rate limit, bad model name, bad output
         log.warning("Query planner fell back to templates: %s: %s", type(e).__name__, e)
-        return _clean(fallback_queries(device.label, items, attempt), previous), f"fallback: {type(e).__name__}"
+        return _clean(fallback_queries(device, items, attempt, criteria), previous), f"fallback: {type(e).__name__}"

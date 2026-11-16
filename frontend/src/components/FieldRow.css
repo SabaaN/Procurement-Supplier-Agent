@@ -12,7 +12,7 @@
 }
 
 .field__head > label:first-child {
-  font-weight: 600;
+  font-weight: 500;
   font-size: var(--text-sm);
 }
 
@@ -40,13 +40,47 @@
   border-color: var(--danger);
 }
 
-.musthave {
+.levels {
   display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
+  margin-top: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.level {
+  position: relative;
+  padding: 2px var(--space-3);
   font-size: var(--text-sm);
-  color: var(--accent);
+  color: var(--muted);
   cursor: pointer;
+  white-space: nowrap;
+}
+
+.level + .level {
+  border-left: 1px solid var(--border);
+}
+
+.level input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.level:hover {
+  color: var(--text);
+}
+
+.level--on {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.level:has(input:focus-visible) {
+  outline: 2px solid var(--link);
+  outline-offset: -2px;
 }
 
 .chips {
@@ -62,9 +96,17 @@
   padding: var(--space-1) var(--space-3);
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: var(--surface);
+  background: transparent;
   font-size: var(--text-sm);
   cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--border-strong);
+}
+
+.chip input {
+  accent-color: var(--accent);
 }
 
 .chip:has(input:checked) {

@@ -14,7 +14,8 @@ _SCHEMAS = [
         ok INTEGER NOT NULL,
         text TEXT,
         error TEXT,
-        fetched_at TEXT NOT NULL
+        fetched_at TEXT NOT NULL,
+        links TEXT               -- JSON: datasheets, emails, phones, site_name
     )
     """,
     """
@@ -23,6 +24,7 @@ _SCHEMAS = [
         device_type TEXT NOT NULL,
         product TEXT,            -- JSON, or NULL when the page is not a product page
         fetched_at TEXT NOT NULL,
+        kind TEXT,               -- product | listing | wrong_type | other (NULL: before kinds existed)
         PRIMARY KEY (url, device_type)
     )
     """,
@@ -48,10 +50,21 @@ def _connect():
     try:
         for schema in _SCHEMAS:
             conn.execute(schema)
+        _migrate(conn)
         yield conn
         conn.commit()
     finally:
         conn.close()
+
+
+def _migrate(conn) -> None:
+    """Databases made before the links column existed get it added (old rows read as no links)."""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(page_cache)")}
+    if "links" not in columns:
+        conn.execute("ALTER TABLE page_cache ADD COLUMN links TEXT")
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(extraction_cache)")}
+    if "kind" not in columns:
+        conn.execute("ALTER TABLE extraction_cache ADD COLUMN kind TEXT")
 
 
 def _fresh(fetched_at: str, max_age_hours: float | None) -> bool:
@@ -69,42 +82,45 @@ def get_page(url: str, max_age_hours: float | None = None) -> dict | None:
     """Cached fetch result, or None if missing or older than the TTL."""
     with _connect() as conn:
         row = conn.execute(
-            "SELECT ok, text, error, fetched_at FROM page_cache WHERE url = ?", (url,)
+            "SELECT ok, text, error, fetched_at, links FROM page_cache WHERE url = ?", (url,)
         ).fetchone()
     if row is None or not _fresh(row[3], max_age_hours):
         return None
-    ok, text, error, _ = row
-    return {"url": url, "ok": bool(ok), "text": text or "", "error": error}
+    ok, text, error, _, links = row
+    return {"url": url, "ok": bool(ok), "text": text or "", "error": error, "links": json.loads(links) if links else {}}
 
 
-def put_page(url: str, ok: bool, text: str, error: str | None) -> None:
+def put_page(url: str, ok: bool, text: str, error: str | None, links: dict | None = None) -> None:
     with _connect() as conn:
         conn.execute(
-            "INSERT OR REPLACE INTO page_cache (url, ok, text, error, fetched_at) VALUES (?, ?, ?, ?, ?)",
-            (url, int(ok), text, error, _now()),
+            "INSERT OR REPLACE INTO page_cache (url, ok, text, error, fetched_at, links) VALUES (?, ?, ?, ?, ?, ?)",
+            (url, int(ok), text, error, _now(), json.dumps(links or {})),
         )
 
 
 # ---- extraction results ----
 
 def get_extraction(url: str, device_type: str, max_age_hours: float | None = None) -> dict | None:
-    """{'product': dict | None} if this page was extracted before (None product = not a product page),
-    or None if it was never extracted or the entry is stale."""
+    """{'product': dict | None, 'kind': str} if this page was extracted before (None product = not a
+    product page; kind says what it was), or None if it was never extracted or the entry is stale."""
     with _connect() as conn:
         row = conn.execute(
-            "SELECT product, fetched_at FROM extraction_cache WHERE url = ? AND device_type = ?",
+            "SELECT product, fetched_at, kind FROM extraction_cache WHERE url = ? AND device_type = ?",
             (url, device_type),
         ).fetchone()
     if row is None or not _fresh(row[1], max_age_hours):
         return None
-    return {"product": json.loads(row[0]) if row[0] else None}
+    product = json.loads(row[0]) if row[0] else None
+    return {"product": product, "kind": row[2] or ("product" if product else "other")}
 
 
-def put_extraction(url: str, device_type: str, product: dict | None) -> None:
+def put_extraction(url: str, device_type: str, product: dict | None, kind: str | None = None) -> None:
+    kind = kind or ("product" if product is not None else "other")
     with _connect() as conn:
         conn.execute(
-            "INSERT OR REPLACE INTO extraction_cache (url, device_type, product, fetched_at) VALUES (?, ?, ?, ?)",
-            (url, device_type, json.dumps(product) if product is not None else None, _now()),
+            "INSERT OR REPLACE INTO extraction_cache (url, device_type, product, fetched_at, kind) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (url, device_type, json.dumps(product) if product is not None else None, _now(), kind),
         )
 
 # ---- exchange rates ----

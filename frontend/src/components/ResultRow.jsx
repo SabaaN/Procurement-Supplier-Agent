@@ -1,6 +1,42 @@
 import { useState } from 'react'
+import { downloadDatasheet } from '../api'
 import { keySpecs } from '../devices'
-import { money, safeUrl, scoreTone, supplierName } from '../format'
+import { companyName, hostname, mailtoUrl, money, safeUrl, scoreTone, telUrl } from '../format'
+
+const COLUMNS = 12 // keep in step with the headers in ResultsTable
+
+/** Downloads the PDF through the backend; if that fails, says why and offers the original link. */
+function DatasheetCell({ searchId, product }) {
+  const [state, setState] = useState({ busy: false, error: null })
+  const original = safeUrl(product.datasheet_url)
+  if (!original) return <span className="muted">Not found</span>
+
+  const download = async () => {
+    setState({ busy: true, error: null })
+    try {
+      await downloadDatasheet(searchId, product.id)
+      setState({ busy: false, error: null })
+    } catch (e) {
+      setState({ busy: false, error: e.message })
+    }
+  }
+
+  return (
+    <div className="datasheet">
+      <button type="button" className="btn btn--sm" onClick={download} disabled={state.busy}>
+        {state.busy ? 'Downloading…' : 'Download PDF'}
+      </button>
+      {state.error && (
+        <span className="datasheet__error" role="alert">
+          {state.error}
+        </span>
+      )}
+      <a className="muted datasheet__link" href={original} target="_blank" rel="noreferrer noopener">
+        {state.error ? 'Try opening it on the supplier site' : 'Open original'}
+      </a>
+    </div>
+  )
+}
 
 const BREAKDOWN = {
   preferences: 'Preferred specs',
@@ -16,13 +52,18 @@ function Meter({ value, tone }) {
   )
 }
 
-export default function ResultRow({ product: p, deviceKey, currency, quantity, onToggle }) {
+export default function ResultRow({ product: p, searchId, deviceKey, currency, quantity, onToggle }) {
   const [open, setOpen] = useState(false)
-  const link = safeUrl(p.source_url)
+  const link = safeUrl(p.product_link || p.source_url)
+  const mailto = mailtoUrl(p.email)
+  const tel = telUrl(p.contact_no)
   const specs = keySpecs(deviceKey, p)
   const tone = scoreTone(p.match_score ?? 0)
   const met = p.requirements_met ?? []
   const missed = p.requirements_missed ?? []
+  const close = p.requirements_close ?? []
+  const closeNotes = p.close_notes ?? []
+  const misses = p.misses ?? []
   const flags = p.flags ?? []
 
   return (
@@ -52,7 +93,10 @@ export default function ResultRow({ product: p, deviceKey, currency, quantity, o
           ) : (
             <span className="product__title">{p.title}</span>
           )}
-          <div className="muted product__supplier">{supplierName(p)}</div>
+          {p.near_miss && misses.length > 0 && (
+            <div className="nearmiss">Not an exact match: {misses.join('; ')}</div>
+          )}
+          {!p.near_miss && closeNotes.length > 0 && <div className="closenote">≈ {closeNotes.join('; ')}</div>}
         </td>
 
         <td className="cell cell--score" data-label="Match">
@@ -87,6 +131,32 @@ export default function ResultRow({ product: p, deviceKey, currency, quantity, o
           )}
         </td>
 
+        <td className="cell cell--company" data-label="Company name">
+          {companyName(p)}
+        </td>
+
+        <td className="cell cell--contact" data-label="Email">
+          {p.email ? mailto ? <a href={mailto}>{p.email}</a> : p.email : <span className="muted">—</span>}
+        </td>
+
+        <td className="cell cell--contact cell--phone" data-label="Contact no">
+          {p.contact_no ? tel ? <a href={tel}>{p.contact_no}</a> : p.contact_no : <span className="muted">—</span>}
+        </td>
+
+        <td className="cell cell--link" data-label="Product link">
+          {link ? (
+            <a href={link} target="_blank" rel="noreferrer noopener" title={link}>
+              {hostname(link) || 'Open'} ↗
+            </a>
+          ) : (
+            <span className="muted">—</span>
+          )}
+        </td>
+
+        <td className="cell cell--datasheet" data-label="Datasheet">
+          <DatasheetCell searchId={searchId} product={p} />
+        </td>
+
         <td className="cell cell--specs" data-label="Key specs">
           {specs.length ? specs.join(' · ') : <span className="muted">—</span>}
         </td>
@@ -105,15 +175,20 @@ export default function ResultRow({ product: p, deviceKey, currency, quantity, o
 
       {open && (
         <tr className="why">
-          <td colSpan={7}>
+          <td colSpan={COLUMNS}>
             <div className="why__body">
               {p.explanation && <p className="why__text">{p.explanation}</p>}
 
-              {(met.length > 0 || missed.length > 0) && (
+              {(met.length > 0 || missed.length > 0 || close.length > 0) && (
                 <div className="badges">
                   {met.map((m) => (
                     <span key={`met-${m}`} className="badge badge--met">
                       ✓ {m}
+                    </span>
+                  ))}
+                  {close.map((m) => (
+                    <span key={`close-${m}`} className="badge badge--close">
+                      ≈ {m}
                     </span>
                   ))}
                   {missed.map((m) => (

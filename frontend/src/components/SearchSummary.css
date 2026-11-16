@@ -31,6 +31,12 @@
   color: var(--muted);
 }
 
+.tag--flexible {
+  border-style: dashed;
+  border-color: var(--link);
+  color: var(--text);
+}
+
 .tag--required {
   background: var(--accent-soft);
   border-color: var(--accent);

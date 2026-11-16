@@ -1,7 +1,7 @@
 .drawer__backdrop {
   position: fixed;
   inset: 0;
-  background: rgb(0 0 0 / 0.35);
+  background: rgb(12 6 8 / 0.65);
   z-index: 40;
 }
 
@@ -28,7 +28,9 @@
 
 .drawer__head h2 {
   margin: 0;
-  font-size: var(--text-lg);
+  font-family: var(--font-serif);
+  font-size: var(--text-xl);
+  font-weight: 400;
 }
 
 .history {
@@ -46,7 +48,7 @@
   padding: var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--surface);
+  background: transparent;
   color: var(--text);
   text-align: left;
   cursor: pointer;

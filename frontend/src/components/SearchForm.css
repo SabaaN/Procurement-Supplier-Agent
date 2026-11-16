@@ -1,6 +1,12 @@
 .form {
   display: grid;
-  gap: var(--space-5);
+  gap: var(--space-6);
+}
+
+/* sections after the first are set off by a hairline */
+.form__section + .form__section {
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--border);
 }
 
 .form__device {
@@ -10,17 +16,16 @@
 }
 
 .form__device label {
-  font-weight: 600;
+  font-weight: 500;
   font-size: var(--text-sm);
 }
 
 .form__section h2 {
-  margin: 0 0 var(--space-3);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
+  margin: 0 0 var(--space-4);
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  font-weight: 400;
+  color: var(--text);
 }
 
 .form__grid {
@@ -29,8 +34,17 @@
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
 }
 
+.form__actions .btn--primary {
+  padding: var(--space-3) var(--space-6);
+}
+
 .form__actions {
   display: flex;
   align-items: center;
   gap: var(--space-4);
+}
+.form__flexbudget {
+  margin-top: var(--space-3);
+  width: fit-content;
+  max-width: 100%;
 }

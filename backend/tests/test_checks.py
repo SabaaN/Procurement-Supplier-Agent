@@ -25,10 +25,15 @@ def test_required_miss_drops():
     assert v["dropped_for"] == ["Shutter type: does not meet requirement"]
 
 
-def test_required_missing_data_drops_and_is_not_guessed():
+def test_required_missing_data_is_kept_as_unknown_not_guessed():
     v = check_product(CRIT, product(megapixels=None))
+    assert v["dropped_for"] == []
+    assert "Resolution" in v["unknown"] and "Resolution" not in v["met"]
+
+
+def test_required_missing_data_drops_in_strict_mode():
+    v = check_product(CRIT, product(megapixels=None), strict=True)
     assert v["dropped_for"] == ["Resolution: not found on page"]
-    assert "Resolution" in v["unknown"]
 
 
 def test_preferred_miss_or_unknown_never_drops():
@@ -57,3 +62,25 @@ def test_filter_node_records_drops_and_keeps_verdicts():
     assert {d["title"] for d in out["dropped"]} == {"rolling", "dear"}
     slow = out["candidates"][1]
     assert slow["requirements_missed"] == ["Frame rate"]
+
+def test_filter_keeps_unconfirmed_products_flagged_and_ranks_them_lower(monkeypatch):
+    events = []
+    monkeypatch.setattr(nodes, "emit", lambda *a, **k: events.append(a))
+    state = {
+        "criteria": {**CRIT, "budget_min": None, "budget_max": 2000},
+        "products": [
+            product(title="unconfirmed", fps=None),
+            product(title="confirmed"),
+            product(title="dear", price=5000),
+        ],
+    }
+    out = nodes.filter_products(state)
+    kept = {p["title"]: p for p in out["candidates"]}
+    assert set(kept) == {"unconfirmed", "confirmed"}
+    assert "Frame rate: not found on page" in kept["unconfirmed"]["flags"]
+    assert "dropped: 1 price above budget" in events[-1][2]
+
+    from app.graph import scoring
+    ranked = scoring.score_products(state["criteria"], out["candidates"])
+    by_title = {p["title"]: p["match_score"] for p in ranked}
+    assert by_title["confirmed"] > by_title["unconfirmed"]

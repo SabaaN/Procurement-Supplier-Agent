@@ -35,6 +35,13 @@ def fake_services(monkeypatch, tmp_path):
     monkeypatch.setattr(web_search, "search_web", fake_search)
     monkeypatch.setattr(page_fetcher, "fetch_page", fake_fetch)
     monkeypatch.setattr(extractor, "extract_product", fake_extract)
+
+    def fake_extract_page(device_key, url, title, text):
+        # goes through extract_product, so tests that patch that keep working
+        product = extractor.extract_product(device_key, url, title, text)
+        return ("product" if product else "other"), product
+
+    monkeypatch.setattr(extractor, "extract_page", fake_extract_page)
     monkeypatch.setattr(cache, "_db_path", lambda: tmp_path / "test.db")
     monkeypatch.setattr(fx, "_fetch_usd_rates", lambda: {"USD": 1.0, "PKR": 280.0, "EUR": 0.9})
     monkeypatch.setattr(fx, "_last_failure", None)

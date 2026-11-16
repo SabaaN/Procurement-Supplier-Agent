@@ -8,9 +8,15 @@ body {
   margin: 0;
   font-family: var(--font-sans);
   font-size: var(--text-base);
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--text);
   background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-contrast);
 }
 
 input,
@@ -26,17 +32,35 @@ select,
 textarea {
   width: 100%;
   padding: var(--space-2) var(--space-3);
-  background: var(--surface);
+  background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
+  transition: border-color 0.15s;
+}
+
+input[type='number']:hover,
+select:hover,
+textarea:hover {
+  border-color: var(--border-strong);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+  opacity: 0.8;
 }
 
 textarea {
   resize: vertical;
 }
 
+a {
+  color: var(--link);
+  text-underline-offset: 0.2em;
+}
+
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--link);
   outline-offset: 2px;
 }
 
@@ -44,31 +68,40 @@ textarea {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: var(--space-5);
-  box-shadow: var(--shadow);
+  padding: var(--space-6);
 }
 
 .btn {
   display: inline-block;
   padding: var(--space-2) var(--space-5);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: var(--surface);
+  background: transparent;
   color: var(--text);
+  font-weight: 500;
   text-align: center;
   text-decoration: none;
   cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--link);
 }
 
 .btn--primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--wine);
+  border-color: var(--wine);
   color: var(--accent-contrast);
-  font-weight: 600;
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--wine-hover);
+  border-color: var(--wine-hover);
 }
 
 .btn:disabled {
-  opacity: 0.55;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
@@ -85,4 +118,10 @@ textarea {
 
 .muted {
   color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
 }

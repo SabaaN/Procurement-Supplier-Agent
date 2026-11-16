@@ -164,6 +164,11 @@ def get_products(search_id: str) -> list[dict]:
     return [{**json.loads(data), "id": pid, "rank": rank, "shortlisted": bool(star)} for pid, rank, data, star in rows]
 
 
+def get_product(search_id: str, product_id: int) -> dict | None:
+    """One product of this search, or None if it doesn't belong to it."""
+    return next((p for p in get_products(search_id) if p["id"] == product_id), None)
+
+
 def set_shortlisted(search_id: str, product_id: int, shortlisted: bool) -> bool:
     """Star or unstar a product. False if it doesn't belong to this search."""
     with _connect() as conn:

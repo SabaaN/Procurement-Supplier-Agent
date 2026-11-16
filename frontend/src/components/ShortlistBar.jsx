@@ -8,7 +8,7 @@ export default function ShortlistBar({ searchId, count }) {
       </span>
       <div className="shortlist__actions">
         <a className="btn" href={exportUrl(searchId)} download>
-          Export all
+          Export all (CSV)
         </a>
         {count > 0 ? (
           <a className="btn btn--primary" href={exportUrl(searchId, true)} download>

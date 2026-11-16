@@ -19,7 +19,7 @@ def start(raw: dict, device="camera") -> dict:
 def test_parse_ok():
     s = start({"min_megapixels": {"value": 5, "required": True}, "budget_max": 20000})
     assert s["error"] is None
-    assert s["criteria"]["min_megapixels"] == {"value": 5.0, "required": True}
+    assert s["criteria"]["min_megapixels"] == {"value": 5.0, "required": True, "flexible": False}
     assert nodes.route_device(s) == "camera"
 
 
@@ -39,15 +39,19 @@ def test_filter_applies_budget_and_flags_missing_price():
     state = {
         "criteria": {"budget_min": 10000, "budget_max": 20000},
         "products": [
-            {"title": "cheap", "price": 5000},
+            {"title": "cheap", "price": 4000},
             {"title": "ok", "price": 15000},
             {"title": "dear", "price": 30000},
             {"title": "unknown", "price": None},
         ],
     }
-    kept = nodes.filter_products(state)["candidates"]
-    assert [p["title"] for p in kept] == ["ok", "unknown"]
-    assert "price_missing" in kept[1]["flags"]
+    out = nodes.filter_products(state)
+    kept = {p["title"]: p for p in out["candidates"]}
+    assert list(kept) == ["cheap", "ok", "unknown"]  # cheaper than the minimum is fine
+    assert any("unusually cheap" in f for f in kept["cheap"]["flags"])  # 4000 < half of 10000
+    assert not any("unusually cheap" in f for f in kept["ok"]["flags"])
+    assert "price_missing" in kept["unknown"]["flags"]
+    assert out["dropped"][0]["title"] == "dear" and out["dropped"][0]["reasons"] == ["Price above budget (50% over)"]
 
 
 def test_loop_broadens_search_when_too_few_survive():

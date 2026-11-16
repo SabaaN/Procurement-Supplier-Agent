@@ -17,7 +17,8 @@ from pydantic import BaseModel, ValidationError
 from .devices import UnsupportedDevice, get_device, list_devices
 from .devices.base import ProductBase
 from .runner import run_search
-from .services import store
+from .services import datasheets, store
+from .services.contacts import enrich
 
 TERMINAL = {"done", "failed"}
 
@@ -81,13 +82,20 @@ def create_search(req: SearchRequest, background: BackgroundTasks):
     try:  # reject bad form input now, with field names, instead of failing in the background
         device.criteria_model.model_validate(req.criteria)
     except ValidationError as e:
-        raise HTTPException(
-            422,
-            [{"field": ".".join(str(x) for x in err["loc"]), "message": err["msg"]} for err in e.errors()],
-        )
+        raise HTTPException(422, [_field_error(err) for err in e.errors()])
     search_id = store.create_search(req.device_type, req.criteria)
     background.add_task(run_search, search_id)
     return {"id": search_id}
+
+
+def _field_error(err: dict) -> dict:
+    """One validation error as {field, message}. Errors about the whole form (no field) are pinned to
+    the field they concern, so the form can highlight it."""
+    field = ".".join(str(x) for x in err["loc"])
+    message = err["msg"].removeprefix("Value error, ")
+    if not field and "budget" in message:
+        field, message = "budget_max", "Budget max must be at least Budget min"
+    return {"field": field, "message": message}
 
 
 @app.get("/api/searches")
@@ -155,10 +163,17 @@ def shortlist(search_id: str, req: ShortlistRequest):
     return {"product_id": req.product_id, "shortlisted": req.shortlisted}
 
 
+# (product field, CSV header). The supplier-contact columns use the names buyers asked for.
 CORE_COLUMNS = [
-    "rank", "title", "supplier", "part_number", "price", "currency", "price_buyer", "total_cost",
-    "match_score", "requirements_met", "requirements_missed", "flags", "explanation",
-    "source_url", "fetched_at",
+    ("rank", "rank"), ("title", "title"),
+    ("company_name", "Company name"), ("email", "Email"), ("contact_no", "Contact no"),
+    ("product_link", "Product link"), ("datasheet_url", "Datasheet (PDF)"),
+    ("supplier", "supplier"), ("part_number", "part_number"), ("price", "price"), ("currency", "currency"),
+    ("price_buyer", "price_buyer"), ("total_cost", "total_cost"), ("match_score", "match_score"),
+    ("requirements_met", "requirements_met"), ("requirements_close", "requirements_close"),
+    ("close_notes", "close_notes"), ("requirements_missed", "requirements_missed"),
+    ("misses", "Not an exact match because"),
+    ("flags", "flags"), ("explanation", "explanation"), ("fetched_at", "fetched_at"),
 ]
 
 
@@ -179,15 +194,40 @@ def export_csv(search_id: str, shortlist_only: bool = Query(False)):
         products = [p for p in products if p["shortlisted"]]
     device = get_device(search["device_type"])
     spec_columns = sorted(set(device.spec_model.model_fields) - set(ProductBase.model_fields))
-    columns = CORE_COLUMNS + spec_columns
+    columns = CORE_COLUMNS + [(c, c) for c in spec_columns]
 
     out = io.StringIO()
     writer = csv.writer(out)
-    writer.writerow(columns)
+    writer.writerow([header for _, header in columns])
     for p in products:
-        writer.writerow([_cell(p.get(c)) for c in columns])
+        if "product_link" not in p:  # saved before contact columns existed: fill what we can
+            p = {**enrich(p, None), **{k: v for k, v in p.items() if v is not None}}
+        writer.writerow([_cell(p.get(key)) for key, _ in columns])
     return Response(
         "\ufeff" + out.getvalue(),  # the BOM makes Excel read the file as UTF-8
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="results-{search_id[:8]}.csv"'},
+    )
+
+# ---- datasheets ----
+
+@app.get("/api/searches/{search_id}/products/{product_id}/datasheet")
+def datasheet(search_id: str, product_id: int):
+    """Downloads the product's datasheet PDF from the supplier and returns it as a file."""
+    _search_or_404(search_id)
+    product = store.get_product(search_id, product_id)
+    if product is None:
+        raise HTTPException(404, "Product not found in this search")
+    url = product.get("datasheet_url")
+    if not url:
+        raise HTTPException(404, "No datasheet was found on this product's page")
+    try:
+        pdf = datasheets.download(url)
+    except datasheets.DatasheetError as e:
+        raise HTTPException(502, str(e))
+    name = datasheets.filename_for(url, product.get("title"))
+    return Response(
+        pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{name}"'},
     )

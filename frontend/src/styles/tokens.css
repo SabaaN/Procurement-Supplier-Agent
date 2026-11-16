@@ -1,11 +1,19 @@
+/* One dark theme: an oxblood-tinted dark, burgundy for actions, rose where text must read on dark,
+   brass only for starred items. */
 :root {
-  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: dark; /* native selects, number spinners and scrollbars follow */
+
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-serif: 'Libre Caslon Text', Georgia, 'Times New Roman', serif;
+  --font-display: 'Libre Caslon Display', 'Libre Caslon Text', Georgia, serif;
   --font-mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
 
+  /* scale: 14 / 16 / 20 / 26 / 40 */
   --text-sm: 0.875rem;
   --text-base: 1rem;
   --text-lg: 1.25rem;
-  --text-xl: 1.75rem;
+  --text-xl: 1.625rem;
+  --text-display: 2.5rem;
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -13,46 +21,33 @@
   --space-4: 1rem;
   --space-5: 1.5rem;
   --space-6: 2rem;
+  --space-7: 3rem;
 
-  --radius: 10px;
-  --radius-sm: 6px;
+  --radius: 8px; /* panels */
+  --radius-sm: 4px; /* inputs, buttons */
 
-    /* light */
-  --ok: #1b7f4b;
-  --ok-soft: #e1f3e9;
-  --warn: #a35f00;
+  --bg: #1c1316;
+  --surface: #241a1d;
+  --surface-2: #2d2125; /* inputs and inset areas */
+  --border: #3d2d31;
+  --border-strong: #574046;
+  --text: #eee4e1;
+  --muted: #a8958f;
 
-      /* dark */
-  --ok: #6fd39a;
-  --ok-soft: #173826;
-  --warn: #f0b35a;
+  --wine: #8e2a3e; /* primary buttons */
+  --wine-hover: #a3344b;
+  --accent: #9e3349; /* fills and selected borders */
+  --accent-contrast: #f7ecea;
+  --accent-soft: #46222d; /* selected backgrounds */
+  --link: #de97a6; /* text links and focus: burgundy is too dark to read on this ground */
+  --brass: #c7a56a;
 
-  --bg: #f4f6f8;
-  --surface: #ffffff;
-  --text: #16202a;
-  --muted: #5d6b79;
-  --border: #d5dce4;
-  --accent: #0b6e8a;
-  --accent-contrast: #ffffff;
-  --accent-soft: #e0f0f4;
-  --danger: #b3261e;
-  --danger-soft: #fbeae8;
-  --shadow: 0 1px 2px rgb(16 24 32 / 0.06), 0 6px 16px rgb(16 24 32 / 0.04);
+  --ok: #9cc5a1;
+  --ok-soft: #1f2e24;
+  --warn: #d9ae6c;
+  --warn-soft: #33281a;
+  --danger: #e8949a;
+  --danger-soft: #3a1c21;
+
+  --shadow: none;
 }
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0e141a;
-    --surface: #17212b;
-    --text: #e6ebf0;
-    --muted: #9aa8b5;
-    --border: #2b3a48;
-    --accent: #4cb8d4;
-    --accent-contrast: #06222b;
-    --accent-soft: #14323c;
-    --danger: #f2b8b5;
-    --danger-soft: #3b1f1d;
-    --shadow: none;
-  }
-}
-

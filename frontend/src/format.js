@@ -24,3 +24,14 @@ export function hostname(url) {
 }
 
 export const supplierName = (p) => p.supplier || hostname(p.source_url) || 'Unknown supplier'
+
+export const companyName = (p) => p.company_name || supplierName(p)
+
+/** mailto:/tel: links only for values that look like an email / phone number (they come from the web). */
+export const mailtoUrl = (email) =>
+  typeof email === 'string' && /^[^\s@<>"]+@[^\s@<>"]+\.[a-z]{2,}$/i.test(email) ? `mailto:${email}` : null
+
+export const telUrl = (phone) => {
+  const digits = typeof phone === 'string' ? phone.replace(/[^\d+]/g, '') : ''
+  return /^\+?\d{8,15}$/.test(digits) ? `tel:${digits}` : null
+}

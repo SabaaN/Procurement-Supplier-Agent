@@ -118,8 +118,8 @@ def test_extraction_cache_roundtrip_including_not_a_product():
     assert cache.get_extraction("https://a.test", "camera") is None
     cache.put_extraction("https://a.test", "camera", {"title": "X"})
     cache.put_extraction("https://a.test/blog", "camera", None)
-    assert cache.get_extraction("https://a.test", "camera") == {"product": {"title": "X"}}
-    assert cache.get_extraction("https://a.test/blog", "camera") == {"product": None}
+    assert cache.get_extraction("https://a.test", "camera") == {"product": {"title": "X"}, "kind": "product"}
+    assert cache.get_extraction("https://a.test/blog", "camera") == {"product": None, "kind": "other"}
     assert cache.get_extraction("https://a.test", "camera", max_age_hours=-1) is None  # expired
 
 
@@ -161,7 +161,7 @@ def test_failed_extractions_are_not_cached(monkeypatch):
 
     monkeypatch.setattr(extractor, "extract_product", boom)
     nodes.extract({"device_type": "camera", "pages": PAGES[:1]})
-    assert cache.get_extraction("https://a.test/p", "camera") is None
+    assert cache.get_extraction("https://a.test/p", extractor.cache_key("camera")) is None
 
 
 # ---- currency-aware budget filter ----

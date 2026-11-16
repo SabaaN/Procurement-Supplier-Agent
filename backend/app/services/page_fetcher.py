@@ -5,7 +5,7 @@ so one bad site can't break a search.
 """
 import logging
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from urllib.parse import urlsplit
 from urllib.robotparser import RobotFileParser
@@ -14,6 +14,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from ..config import settings
+from . import contacts
 
 log = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ class FetchResult:
     ok: bool
     text: str = ""
     error: str | None = None
+    links: dict = field(default_factory=dict)  # datasheets, emails, phones, site_name (see contacts.py)
 
 
 _client: httpx.Client | None = None
@@ -147,10 +149,16 @@ def fetch_page(url: str, client: httpx.Client | None = None) -> FetchResult:
                     break
             encoding = resp.encoding or "utf-8"
 
-        text = clean_html(raw.decode(encoding, errors="replace"))
+        html = raw.decode(encoding, errors="replace")
+        text = clean_html(html)
         if len(text) < settings.min_page_chars:
             return FetchResult(url, False, error="too little text (page may need JavaScript)")
-        return FetchResult(url, True, text=text)
+        try:
+            links = contacts.page_links(html, str(resp.url))  # after redirects, so relative links resolve
+        except Exception as e:  # contact details are a bonus: never lose the page over them
+            log.warning("Could not read links on %s: %s", url, e)
+            links = {}
+        return FetchResult(url, True, text=text, links=links)
     except httpx.TimeoutException:
         return FetchResult(url, False, error="timeout")
     except Exception as e:  # network errors, bad encodings, parser errors...

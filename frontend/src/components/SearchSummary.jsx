@@ -9,7 +9,7 @@ export default function SearchSummary({ search, onNew }) {
         <strong>{search.deviceLabel}</strong>
         <ul className="summary__chips">
           {chips.map((c) => (
-            <li key={c.text} className={c.required ? 'tag tag--required' : 'tag'}>
+            <li key={c.text} className={c.required ? 'tag tag--required' : c.flexible ? 'tag tag--flexible' : 'tag'}>
               {c.text}
             </li>
           ))}

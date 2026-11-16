@@ -12,7 +12,9 @@
 
 .results__title {
   margin: 0;
-  font-size: var(--text-lg);
+  font-family: var(--font-serif);
+  font-size: var(--text-xl);
+  font-weight: 400;
 }
 
 .filters {
@@ -25,14 +27,20 @@
   padding: var(--space-1) var(--space-3);
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: var(--surface);
+  background: transparent;
+  color: var(--muted);
   font-size: var(--text-sm);
   cursor: pointer;
+}
+
+.filter:hover {
+  color: var(--text);
 }
 
 .filter[aria-pressed='true'] {
   background: var(--accent-soft);
   border-color: var(--accent);
+  color: var(--text);
 }
 
 .sortpick {
@@ -52,12 +60,16 @@
   border-collapse: collapse;
 }
 
+.table {
+  font-variant-numeric: tabular-nums;
+}
+
 .table th {
   padding: var(--space-3);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-strong);
   text-align: left;
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 500;
   color: var(--muted);
   white-space: nowrap;
 }
@@ -76,13 +88,17 @@
 }
 
 .row > td {
-  padding: var(--space-3);
+  padding: var(--space-4) var(--space-3);
   border-bottom: 1px solid var(--border);
   vertical-align: top;
 }
 
+.row:hover > td {
+  background: rgb(255 255 255 / 0.015);
+}
+
 .row--starred > td {
-  background: var(--accent-soft);
+  background: rgb(199 165 106 / 0.06);
 }
 
 .cell--rank {
@@ -90,12 +106,66 @@
   font-variant-numeric: tabular-nums;
 }
 
-.cell--specs {
+.cell--specs,
+.cell--company,
+.cell--contact,
+.cell--link,
+.cell--datasheet {
   font-size: var(--text-sm);
 }
 
+.cell--product {
+  min-width: 15rem;
+}
+
+.cell--price {
+  min-width: 8rem;
+}
+
+.cell--company {
+  min-width: 8rem;
+}
+
+.cell--contact,
+.cell--link {
+  overflow-wrap: anywhere;
+  min-width: 10rem;
+}
+
+.cell--phone a,
+.cell--phone {
+  white-space: nowrap;
+}
+
+.cell--link a,
+.cell--contact a {
+  color: var(--link);
+}
+
+.datasheet {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: start;
+  min-width: 8.5rem;
+}
+
+.btn--sm {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.datasheet__link {
+  font-size: var(--text-sm);
+}
+
+.datasheet__error {
+  font-size: var(--text-sm);
+  color: var(--danger);
+}
+
 .product__title {
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text);
   text-decoration: none;
   overflow-wrap: anywhere;
@@ -110,10 +180,15 @@ a.product__title:hover {
   font-size: var(--text-sm);
 }
 
-.price__unit,
+.price__unit {
+  font-weight: 500;
+}
+
+/* the match score is the figure buyers scan for: set in the serif */
 .score__num {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  line-height: 1.1;
 }
 
 .score {
@@ -123,7 +198,7 @@ a.product__title:hover {
 }
 
 .meter {
-  height: 6px;
+  height: 3px;
   overflow: hidden;
   border-radius: 999px;
   background: var(--border);
@@ -152,8 +227,13 @@ a.product__title:hover {
   cursor: pointer;
 }
 
-.star--on {
-  color: var(--warn);
+.star:hover {
+  color: var(--text);
+}
+
+.star--on,
+.star--on:hover {
+  color: var(--brass);
 }
 
 .why > td {
@@ -166,7 +246,7 @@ a.product__title:hover {
   gap: var(--space-3);
   padding: var(--space-4);
   border-radius: var(--radius-sm);
-  background: var(--bg);
+  background: var(--surface-2);
 }
 
 .why__text,
@@ -235,10 +315,10 @@ a.product__title:hover {
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: var(--shadow);
+  background: rgb(36 26 29 / 0.92);
+  backdrop-filter: blur(8px);
 }
 
 .shortlist__actions {
@@ -290,8 +370,8 @@ a.product__title:hover {
   }
 
   .row--starred {
-    border-color: var(--accent);
-    background: var(--accent-soft);
+    border-color: rgb(199 165 106 / 0.45);
+    background: rgb(199 165 106 / 0.05);
   }
 
   .cell--star {
@@ -306,12 +386,18 @@ a.product__title:hover {
 
   .cell--product,
   .cell--specs,
-  .cell--toggle {
+  .cell--toggle,
+  .cell--link,
+  .cell--datasheet {
     grid-column: 1 / -1;
   }
 
   .cell--product {
     padding-right: var(--space-5);
+  }
+
+  .row > td {
+    min-width: 0;
   }
 
   td[data-label]:not([data-label=''])::before {
@@ -333,4 +419,28 @@ a.product__title:hover {
   .row {
     margin-bottom: var(--space-3);
   }
+}
+.nearmiss,
+.closenote {
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.nearmiss {
+  color: var(--danger);
+}
+
+.closenote {
+  color: var(--muted);
+}
+
+.badge--close {
+  border-style: dashed;
+}
+
+.banner--warn {
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--brass);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
 }

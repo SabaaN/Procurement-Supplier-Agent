@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ApiError, createSearch, getDeviceForm, getDevices } from '../api'
-import { buildCriteria, fieldErrors } from '../criteria'
+import { buildCriteria, errorSummary, fieldErrors } from '../criteria'
 import FieldRow from './FieldRow'
 import './SearchForm.css'
 
@@ -11,7 +11,8 @@ export default function SearchForm({ onStarted }) {
   const [device, setDevice] = useState('')
   const [form, setForm] = useState(null) // { key, label, fields } for the chosen device
   const [values, setValues] = useState({})
-  const [required, setRequired] = useState({})
+  const [levels, setLevels] = useState({})
+  const [flexibleBudget, setFlexibleBudget] = useState(false)
   const [currency, setCurrency] = useState('PKR')
   const [notes, setNotes] = useState('')
   const [errors, setErrors] = useState({})
@@ -35,7 +36,7 @@ export default function SearchForm({ onStarted }) {
     let cancelled = false
     setForm(null)
     setValues({})
-    setRequired({})
+    setLevels({})
     setErrors({})
     getDeviceForm(device)
       .then((f) => !cancelled && setForm(f))
@@ -49,7 +50,7 @@ export default function SearchForm({ onStarted }) {
     setValues((prev) => ({ ...prev, [name]: v }))
     setErrors((prev) => ({ ...prev, [name]: undefined }))
   }
-  const setRequiredFlag = (name, flag) => setRequired((prev) => ({ ...prev, [name]: flag }))
+  const setLevel = (name, level) => setLevels((prev) => ({ ...prev, [name]: level }))
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -57,13 +58,14 @@ export default function SearchForm({ onStarted }) {
     setMessage(null)
     setSubmitting(true)
     try {
-      const criteria = buildCriteria({ fields: form.fields, values, required, currency, notes })
+      const criteria = buildCriteria({ fields: form.fields, values, levels, currency, notes, flexibleBudget })
       const { id } = await createSearch(device, criteria)
             onStarted({ id, device, deviceLabel: form.label, fields: form.fields, criteria })
     } catch (err) {
       if (err instanceof ApiError && err.status === 422) {
-        setErrors(fieldErrors(err.detail))
-        setMessage('Please fix the highlighted fields.')
+        const found = fieldErrors(err.detail)
+        setErrors(found)
+        setMessage(errorSummary(found, form.fields))
       } else {
         setMessage(err.message)
       }
@@ -77,10 +79,10 @@ export default function SearchForm({ onStarted }) {
   const rowProps = (f) => ({
     field: f,
     value: values[f.name],
-    required: required[f.name],
+    level: levels[f.name],
     error: errors[f.name],
     onChange: setValue,
-    onRequired: setRequiredFlag,
+    onLevel: setLevel,
   })
 
   return (
@@ -127,6 +129,17 @@ export default function SearchForm({ onStarted }) {
                 <FieldRow key={f.name} {...rowProps(f)} />
               ))}
             </div>
+            {values.budget_max !== undefined && values.budget_max !== '' && (
+              <label className="chip form__flexbudget">
+                <input
+                  type="checkbox"
+                  checked={flexibleBudget}
+                  onChange={(e) => setFlexibleBudget(e.target.checked)}
+                />
+                Flexible budget: also show products up to 15% over the maximum (flagged)
+              </label>
+            )}
+            <p className="field__help">Cheaper than the minimum is always fine; very cheap offers are flagged.</p>
           </section>
 
           <section className="form__section">

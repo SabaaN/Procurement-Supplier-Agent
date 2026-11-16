@@ -3,7 +3,13 @@ import './FieldRow.css'
 const hasValue = (v) =>
   !(v === undefined || v === '' || v === false || (Array.isArray(v) && v.length === 0))
 
-export default function FieldRow({ field, value, required, error, onChange, onRequired }) {
+const LEVELS = [
+  { key: 'must', label: 'Must have', help: 'Dropped if the page shows it fails' },
+  { key: 'flexible', label: 'Flexible', help: 'Close values are kept and ranked lower' },
+  { key: 'nice', label: 'Nice to have', help: 'Only affects ranking' },
+]
+
+export default function FieldRow({ field, value, level = 'nice', error, onChange, onLevel }) {
   const id = `field-${field.name}`
   const labelId = `${id}-label`
   let control
@@ -65,18 +71,24 @@ export default function FieldRow({ field, value, required, error, onChange, onRe
           {field.label}
           {field.unit && <span className="field__unit"> ({field.unit})</span>}
         </label>
-        {field.has_required_toggle && hasValue(value) && (
-          <label className="musthave">
-            <input
-              type="checkbox"
-              checked={Boolean(required)}
-              onChange={(e) => onRequired(field.name, e.target.checked)}
-            />
-            Must have
-          </label>
-        )}
       </div>
       {control}
+      {field.has_required_toggle && hasValue(value) && (
+        <div className="levels" role="radiogroup" aria-label={`How firm is ${field.label}?`}>
+          {LEVELS.map((l) => (
+            <label key={l.key} className={`level${level === l.key ? ' level--on' : ''}`} title={l.help}>
+              <input
+                type="radio"
+                name={`${id}-level`}
+                value={l.key}
+                checked={level === l.key}
+                onChange={() => onLevel(field.name, l.key)}
+              />
+              {l.label}
+            </label>
+          ))}
+        </div>
+      )}
       {field.help && <p className="field__help">{field.help}</p>}
       {error && (
         <p className="field__error" role="alert">

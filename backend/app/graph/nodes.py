@@ -3,6 +3,8 @@
 STUB nodes (plan_queries, search, fetch_clean, extract, score) return fake data so the whole
 graph can run end to end. We replace them one at a time in later steps.
 """
+from collections import Counter
+
 from pydantic import ValidationError
 
 from ..devices import UnsupportedDevice, get_device
@@ -12,7 +14,7 @@ from ..services import query_planner, web_search
 from .checks import check_product
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from ..config import settings
-from ..services import cache, explainer, extractor, fx, page_fetcher, query_planner, web_search
+from ..services import cache, contacts, explainer, extractor, fx, page_fetcher, query_planner, web_search
 from . import scoring
 
 MIN_RESULTS = 5  # fewer survivors than this -> plan broader queries
@@ -49,7 +51,8 @@ def finalize(state: SearchState) -> dict:
 
     def sort_key(p):
         cost = p.get("price_buyer") if p.get("price_buyer") is not None else p.get("price")
-        return (-(p.get("match_score") or 0), cost if cost is not None else float("inf"))
+        # closest matches: fewest misses first, then score
+        return (len(p.get("misses", [])), -(p.get("match_score") or 0), cost if cost is not None else float("inf"))
 
     ranked = sorted(state.get("candidates", []), key=sort_key)
     texts, source = explainer.explain(state.get("device_type"), state.get("criteria", {}), ranked)
@@ -98,18 +101,10 @@ def search(state: SearchState) -> dict:
     return {"urls": urls, "hits": hits}
 
 
-def fetch_clean(state: SearchState) -> dict:
-    """Download and clean up to N pages we haven't tried yet. Cached results skip the network."""
-    pages = list(state.get("pages", []))
-    tried = {p["url"] for p in pages}
-    titles = {h["url"]: h.get("title", "") for h in state.get("hits", [])}
-    todo = [u for u in state.get("urls", []) if u not in tried][: settings.max_pages_per_attempt]
-    if not todo:
-        emit("extract", "done", "No new pages to read")
-        return {"pages": pages}
-
+def _fetch(urls: list[str], titles: dict, label: str = "pages") -> list[dict]:
+    """Download and clean these URLs (cached results skip the network). Returns one page dict per URL."""
     results, to_fetch = {}, []
-    for url in todo:
+    for url in urls:
         cached = cache.get_page(url)
         if cached:
             results[url] = cached
@@ -123,45 +118,99 @@ def fetch_clean(state: SearchState) -> dict:
             for fut in as_completed(futures):
                 r = fut.result()  # fetch_page never raises
                 if r.ok or r.error != "timeout":  # timeouts are often temporary: don't cache them
-                    cache.put_page(r.url, r.ok, r.text, r.error)
-                results[r.url] = {"url": r.url, "ok": r.ok, "text": r.text, "error": r.error}
+                    cache.put_page(r.url, r.ok, r.text, r.error, r.links)
+                results[r.url] = {"url": r.url, "ok": r.ok, "text": r.text, "error": r.error, "links": r.links}
                 done += 1
-                emit("extract", "running", f"Reading {done} of {len(todo)} pages", done=done, total=len(todo))
+                emit("extract", "running", f"Reading {done} of {len(urls)} {label}", done=done, total=len(urls))
+    return [{**results[url], "title": titles.get(url, "")} for url in urls]
 
-    for url in todo:
-        pages.append({**results[url], "title": titles.get(url, "")})
-    ok = sum(1 for url in todo if results[url]["ok"])
+
+def fetch_clean(state: SearchState) -> dict:
+    """Download and clean up to N pages we haven't tried yet. Cached results skip the network."""
+    pages = list(state.get("pages", []))
+    tried = {p["url"] for p in pages}
+    titles = {h["url"]: h.get("title", "") for h in state.get("hits", [])}
+    todo = [u for u in state.get("urls", []) if u not in tried][: settings.max_pages_per_attempt]
+    if not todo:
+        emit("extract", "done", "No new pages to read")
+        return {"pages": pages}
+
+    new = _fetch(todo, titles)
+    ok = sum(1 for p in new if p["ok"])
     emit("extract", "running", f"Fetched {ok} of {len(todo)} pages ({len(todo) - ok} unreachable)")
-    return {"pages": pages}
+    return {"pages": pages + new}
+
+
+def _extract_pages(device_key: str, pages: list[dict], label: str = "page") -> tuple[list, Counter, str]:
+    """Run (or reuse cached) extraction on each page. Returns ([(page, kind, product)], kind counts, last error)."""
+    key = extractor.cache_key(device_key)
+    out, counts, last_error = [], Counter(), ""
+    for i, page in enumerate(pages, 1):
+        emit("extract", "running", f"Extracting specs from {label} {i} of {len(pages)}", done=i, total=len(pages))
+        cached = cache.get_extraction(page["url"], key)
+        if cached is not None:
+            kind, product = cached["kind"], cached["product"]
+        else:
+            try:
+                kind, product = extractor.extract_page(device_key, page["url"], page.get("title", ""), page["text"])
+            except extractor.ExtractionError as e:
+                counts["failed"] += 1
+                last_error = str(e)
+                continue  # not cached, so a later attempt can retry it
+            cache.put_extraction(page["url"], key, product, kind)
+        counts[kind] += 1
+        if product is not None:
+            # contacts and datasheet come from the page's links, so cached extractions get them too
+            product = contacts.enrich(product, page.get("links"))
+        out.append((page, kind, product))
+    return out, counts, last_error
+
+
+def _listing_links(results: list, known: set[str]) -> list[str]:
+    """Product links found on listing pages, a few per page, not seen before, capped per attempt."""
+    links = []
+    for page, kind, _ in results:
+        if kind != "listing":
+            continue
+        fresh = [u for u in (page.get("links") or {}).get("products", []) if u not in known and u not in links]
+        links += fresh[: settings.listing_links_per_page]
+    return links[: settings.max_followed_per_attempt]
+
+
+def _kind_summary(counts: Counter) -> str:
+    names = [("listing", "listing pages"), ("wrong_type", "wrong kind of product"),
+             ("other", "not product pages"), ("failed", "failed")]
+    return ", ".join(f"{counts[k]} {name}" for k, name in names if counts[k]) or "nothing else"
 
 
 def extract(state: SearchState) -> dict:
-    """Groq reads each fetched page. Results (including 'not a product page') are cached by URL."""
+    """Groq reads each fetched page (cached by URL). Product links on listing pages are then
+    read one level deeper, so a shop's "5MP cameras - 24 items" page turns into products."""
     device_key = state["device_type"]
-    pages = [p for p in state["pages"] if p["ok"]]  # skip pages that failed to download
-    products, skipped, failed, last_error = [], 0, 0, ""
-    for i, page in enumerate(pages, 1):
-        emit("extract", "running", f"Extracting specs from page {i} of {len(pages)}", done=i, total=len(pages))
-        cached = cache.get_extraction(page["url"], device_key)
-        if cached is not None:
-            product = cached["product"]
-        else:
-            try:
-                product = extractor.extract_product(device_key, page["url"], page.get("title", ""), page["text"])
-            except extractor.ExtractionError as e:
-                failed, last_error = failed + 1, str(e)
-                continue  # not cached, so a later attempt can retry it
-            cache.put_extraction(page["url"], device_key, product)
-        if product is None:
-            skipped += 1
-        else:
-            products.append(product)
+    pages = list(state["pages"])
+    ok_pages = [p for p in pages if p["ok"]]  # skip pages that failed to download
+    results, counts, last_error = _extract_pages(device_key, ok_pages)
 
-    if pages and failed == len(pages):  # the model never worked: stop instead of looping
+    if ok_pages and counts["failed"] == len(ok_pages):  # the model never worked: stop instead of looping
         emit("extract", "failed", f"Extraction failed: {last_error}")
         return {"products": [], "error": f"Extraction failed: {last_error}"}
-    emit("extract", "done", f"{len(products)} products extracted ({skipped} not product pages, {failed} failed)")
-    return {"products": products}
+
+    urls = list(state.get("urls", []))
+    follow = _listing_links(results, set(urls) | {p["url"] for p in pages})
+    if follow:
+        emit("extract", "running", f"Following {len(follow)} product links from {counts['listing']} listing pages")
+        titles = {u: "" for u in follow}
+        followed = _fetch(follow, titles, label="product links")
+        pages += followed
+        urls += follow
+        more, more_counts, _ = _extract_pages(device_key, [p for p in followed if p["ok"]], label="linked page")
+        results += more
+        counts.update(more_counts)
+
+    products = [product for _, kind, product in results if product is not None]
+    emit("extract", "done", f"{len(products)} products extracted ({_kind_summary(counts)})")
+    return {"products": products, "pages": pages, "urls": urls}
+
 
 def convert_prices(state: SearchState) -> dict:
     """Put each price in the buyer's currency and work out the cost for the requested quantity."""
@@ -192,7 +241,12 @@ def convert_prices(state: SearchState) -> dict:
     return {"products": out}
 
 def filter_products(state: SearchState) -> dict:
-    """Python filter: budget (in the buyer's currency), then every requirement the buyer set."""
+    """Python filter: budget (in the buyer's currency), then every requirement the buyer set.
+
+    Cheaper than budget_min is kept (flagged if suspiciously cheap); over budget_max is dropped,
+    unless the budget is flexible and it is within BUDGET_TOLERANCE. Dropped products are kept
+    aside with their reasons, so the closest ones can be shown when nothing matches fully.
+    """
     c = state["criteria"]
     lo, hi = c.get("budget_min"), c.get("budget_max")
     buyer_cur = c.get("currency")
@@ -206,6 +260,7 @@ def filter_products(state: SearchState) -> dict:
         else:
             price_buyer = price if (not cur or not buyer_cur or cur == buyer_cur) else None
 
+        reasons, over = [], 0.0
         if price is None:
             flags.append("price_missing")
         elif price_buyer is None:
@@ -213,26 +268,48 @@ def filter_products(state: SearchState) -> dict:
         else:
             if cur is None:
                 flags.append("currency_unknown")
-            if (lo is not None and price_buyer < lo) or (hi is not None and price_buyer > hi):
-                dropped.append({"title": p.get("title"), "reasons": ["Price outside budget"]})
-                continue
+            if hi is not None and price_buyer > hi:
+                over = (price_buyer - hi) / hi if hi else float("inf")
+                if c.get("flexible_budget") and over <= settings.budget_tolerance:
+                    flags.append(f"{over:.0%} over budget")
+                else:
+                    reasons.append(f"Price above budget ({over:.0%} over)" if hi else "Price above budget")
+            if lo and price_buyer < lo * settings.cheap_ratio:
+                flags.append("unusually cheap for your budget: check it is genuine and the right type")
 
-        verdict = check_product(c, p)
-        if verdict["dropped_for"]:
-            dropped.append({"title": p.get("title"), "reasons": verdict["dropped_for"]})
-            continue
-
+        verdict = check_product(c, p, strict=settings.strict_requirements, tolerance=settings.flexible_tolerance)
+        reasons += verdict["dropped_for"]
         flags += [f"{label}: not found on page" for label in verdict["unknown"]]
-        kept.append({
+        product = {
             **p,
             "requirements_met": verdict["met"],
             "requirements_missed": verdict["missed"],
+            "requirements_close": verdict["close"],
+            "close_notes": verdict["close_notes"],
             "flags": flags,
-        })
+        }
+        if reasons:
+            # how far off: each failed rule counts 1, plus how far over budget
+            dropped.append({"title": p.get("title"), "reasons": reasons,
+                            "distance": len(reasons) + min(over, 5), "product": product})
+        else:
+            kept.append(product)
 
-    emit("filter", "done", f"{len(kept)} of {len(state['products'])} products kept",
+    emit("filter", "done", f"{len(kept)} of {len(state['products'])} products kept{_drop_summary(dropped)}",
          done=len(kept), total=len(state["products"]))
     return {"candidates": kept, "dropped": dropped}
+
+
+def _drop_summary(dropped: list[dict]) -> str:
+    """' (dropped: 3 price outside budget, 1 frame rate: does not meet requirement)' for the progress panel."""
+    counts: dict[str, int] = {}
+    for d in dropped:
+        reason = d["reasons"][0].split(" (")[0].split(":")[0] if d.get("reasons") else "other"
+        counts[reason] = counts.get(reason, 0) + 1
+    if not counts:
+        return ""
+    parts = [f"{n} {reason[0].lower() + reason[1:]}" for reason, n in sorted(counts.items(), key=lambda kv: -kv[1])]
+    return f" (dropped: {', '.join(parts)})"
 
 
 def route_after_filter(state: SearchState) -> str:
@@ -242,6 +319,25 @@ def route_after_filter(state: SearchState) -> str:
     return "plan_queries"
 
 
+NEAR_MISS_PENALTY = 15  # match points removed per miss, so a closest match never looks like a full one
+
+
+def closest_matches(dropped: list[dict], n: int) -> list[dict]:
+    """The n dropped products that came nearest, each marked near_miss with what it misses."""
+    nearest = sorted(dropped, key=lambda d: d.get("distance", len(d["reasons"])))[:n]
+    return [{**d["product"], "near_miss": True, "misses": d["reasons"]} for d in nearest if d.get("product")]
+
+
 def score(state: SearchState) -> dict:
-    """Real scoring: preferences, relative price and data confidence (see scoring.py)."""
-    return {"candidates": scoring.score_products(state["criteria"], state["candidates"])}
+    """Real scoring: preferences, relative price and data confidence (see scoring.py).
+    If nothing matched fully, the closest products are scored and returned instead, marked near_miss."""
+    candidates = state["candidates"]
+    if not candidates and state.get("dropped") and settings.closest_matches > 0:
+        candidates = closest_matches(state["dropped"], settings.closest_matches)
+        if candidates:
+            emit("rank", "running", f"No exact matches: showing the {len(candidates)} closest")
+    scored = scoring.score_products(state["criteria"], candidates)
+    for p in scored:  # a closest match loses points for each thing it misses
+        if p.get("near_miss"):
+            p["match_score"] = max(0.0, round(p["match_score"] - NEAR_MISS_PENALTY * len(p["misses"]), 1))
+    return {"candidates": scored}

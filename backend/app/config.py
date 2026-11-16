@@ -21,7 +21,9 @@ class Settings:
     explain_top_n: int = 10  # only the top N products are sent to the model for explanations
 
     # page fetching
-    max_pages_per_attempt: int = 8  # new pages fetched per search attempt
+    # new pages fetched per search attempt. Each one costs a Groq extraction call: lower this
+    # if the progress panel shows many "failed" extractions (Groq rate limits on the free tier).
+    max_pages_per_attempt: int = int(os.getenv("MAX_PAGES_PER_ATTEMPT", "12"))
     fetch_workers: int = 5  # parallel downloads
     fetch_timeout: float = 15.0  # seconds
     max_page_bytes: int = 2_000_000  # stop downloading a page after this
@@ -29,6 +31,20 @@ class Settings:
     min_page_chars: int = 200  # less than this = probably a JavaScript-only page
     respect_robots: bool = True
     user_agent: str = "ProcurementAgent/0.1 (product research)"
+
+    # filtering. Off: a required spec the page doesn't mention keeps the product, flagged and ranked
+    # lower. On (STRICT_REQUIREMENTS=1): such products are dropped, as before.
+    strict_requirements: bool = os.getenv("STRICT_REQUIREMENTS", "0").lower() in ("1", "true", "yes")
+
+    # how far "Flexible" stretches
+    flexible_tolerance: float = float(os.getenv("FLEXIBLE_TOLERANCE", "0.2"))  # 5 MP flexible accepts 4 MP
+    budget_tolerance: float = float(os.getenv("BUDGET_TOLERANCE", "0.15"))  # flexible budget: up to 15% over
+    cheap_ratio: float = float(os.getenv("CHEAP_RATIO", "0.5"))  # below half the minimum budget: flagged
+    closest_matches: int = int(os.getenv("CLOSEST_MATCHES", "5"))  # shown when nothing matches fully
+
+    # listing pages ("5MP cameras - 24 items"): product links read one level deeper
+    listing_links_per_page: int = int(os.getenv("LISTING_LINKS_PER_PAGE", "4"))
+    max_followed_per_attempt: int = int(os.getenv("MAX_FOLLOWED_PER_ATTEMPT", "12"))
 
     # cache
     cache_ttl_hours: float = 24

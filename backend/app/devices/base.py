@@ -9,14 +9,24 @@ T = TypeVar("T")
 
 
 class Req(BaseModel, Generic[T]):
-    """One requirement: the wanted value, and whether it is a must-have.
+    """One requirement: the wanted value, and how firm it is.
 
-    required=True  -> hard filter (product is dropped if it fails or lacks the field)
-    required=False -> nice-to-have (only affects ranking)
+    required=True  -> must-have: the product is dropped if its page shows it fails
+    flexible=True  -> close is fine: numbers up to FLEXIBLE_TOLERANCE short are kept as close
+                      matches (ranked lower), other values that differ are kept as compromises,
+                      and the spec is left out of the web searches so nearby values are found
+    neither        -> nice-to-have: only affects ranking
     """
 
     value: T
     required: bool = False
+    flexible: bool = False
+
+    @model_validator(mode="after")
+    def _one_level(self):
+        if self.flexible:
+            self.required = False  # flexible wins: it is the softer of the two
+        return self
 
 
 class SharedCriteria(BaseModel):
@@ -26,6 +36,7 @@ class SharedCriteria(BaseModel):
     budget_max: float | None = Field(default=None, ge=0)
     currency: str = "PKR"
     quantity: int = Field(default=1, ge=1)
+    flexible_budget: bool = False  # keep products a little over budget_max (BUDGET_TOLERANCE), flagged
     notes: str = ""  # free text; the only input an LLM has to interpret
 
     @model_validator(mode="after")
@@ -53,6 +64,12 @@ class ProductBase(BaseModel):
     shipping_cost: float | None = None
     rating: float | None = None
     review_count: int | None = None
+    # read from the page's HTML in Python (services/contacts.py), never by the model
+    company_name: str | None = None
+    email: str | None = None
+    contact_no: str | None = None
+    product_link: str | None = None
+    datasheet_url: str | None = None  # a PDF the supplier links from the product page
     # filled in by the filter / score steps
     requirements_met: list[str] = []
     requirements_missed: list[str] = []
@@ -96,6 +113,9 @@ class DeviceDefinition:
     # What the LLM fills in from a page (loose strings), and how Python turns that into spec_model fields.
     extraction_model: type[BaseModel] | None = None
     extraction_hint: str = ""
+    # What to search for, and what the searches must avoid (e.g. CCTV when the buyer wants machine vision).
+    search_term: str = ""
+    search_hint: str = ""
     normalize: Callable[[dict], tuple[dict, list[str]]] | None = None
     # Used only by tests, to fake products without calling Groq.
     stub_spec: Callable[[int, str], ProductBase] | None = None

@@ -9,6 +9,7 @@ const HEADERS = [
   { key: 'title', label: 'Product' },
   { key: 'score', label: 'Match' },
   { key: 'price', label: 'Price' },
+  { key: 'supplier', label: 'Company name' },
 ]
 const DEFAULT_DIR = { score: 'desc' } // best first; everything else starts ascending
 
@@ -48,12 +49,21 @@ export default function ResultsTable({ search, results, onToggleShortlist }) {
       {products.length === 0 ? (
         !error && (
           <div className="card">
-            <strong>No products matched your requirements.</strong>
-            <p className="muted">Try relaxing a must-have or widening the budget.</p>
+            <strong>No products found.</strong>
+            <p className="muted">
+              The agent couldn't read any matching product pages. Try marking specs as Flexible, or setting a
+              flexible budget.
+            </p>
           </div>
         )
       ) : (
         <>
+          {products.every((p) => p.near_miss) && (
+            <div className="banner banner--warn" role="status">
+              <strong>No exact matches – these are the closest options.</strong> Each one says what it misses.
+              Mark that spec as Flexible, or widen the budget, to search around it.
+            </div>
+          )}
           <div className="results__toolbar">
             <h2 className="results__title">
               {shown.length === products.length ? `${products.length} products` : `${shown.length} of ${products.length} products`}
@@ -112,6 +122,10 @@ export default function ResultsTable({ search, results, onToggleShortlist }) {
                       </button>
                     </th>
                   ))}
+                  <th>Email</th>
+                  <th>Contact no</th>
+                  <th>Product link</th>
+                  <th>Datasheet</th>
                   <th>Key specs</th>
                   <th aria-label="Details" />
                 </tr>
@@ -121,6 +135,7 @@ export default function ResultsTable({ search, results, onToggleShortlist }) {
                   <ResultRow
                     key={p.id}
                     product={p}
+                    searchId={search.id}
                     deviceKey={search.device}
                     currency={currency}
                     quantity={quantity}

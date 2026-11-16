@@ -17,6 +17,15 @@ from ..devices import get_device
 log = logging.getLogger(__name__)
 
 
+# Bump when the extraction prompt or schema changes, so pages read with the old one are read again.
+EXTRACTION_VERSION = 2
+
+
+def cache_key(device_key: str) -> str:
+    """The extraction cache's device key, versioned."""
+    return f"{device_key}:v{EXTRACTION_VERSION}"
+
+
 class ExtractionError(RuntimeError):
     """The model failed (or the key is missing). The page is skipped and not cached."""
 
@@ -26,6 +35,8 @@ SYSTEM = (
     "If a field is not stated, return null. Never guess, never infer from the product name, never use outside "
     "knowledge. Set is_product_page to true only if the page describes one specific product or model that can "
     "be bought; set it to false for category or listing pages, articles, blogs, manuals and company pages. "
+    "Set is_listing_page to true for a shop's category, search-results or catalogue page that shows several "
+    "products for sale. Set is_right_device_type as the device notes describe. "
     "For price give ONE unit as a plain number (no symbols or thousands separators) and the ISO currency code "
     "only if the page shows it clearly; otherwise null."
 )
@@ -89,14 +100,35 @@ def _currency(value: str | None) -> str | None:
     return _CURRENCY_NAMES.get(s.lower())
 
 
-def extract_product(device_key: str, url: str, title: str, text: str) -> dict | None:
-    """A product dict (the device's spec model, dumped), or None if the page is not a product page.
+PAGE_KINDS = ("product", "listing", "wrong_type", "other")
+
+
+def extract_page(device_key: str, url: str, title: str, text: str) -> tuple[str, dict | None]:
+    """(kind, product). kind is one of PAGE_KINDS; product is set only for 'product'.
+
+    'listing'    a shop page listing several products: the caller can follow its product links
+    'wrong_type' a product of another kind (e.g. a CCTV camera when the buyer wants machine vision)
+    'other'      articles, manuals, company pages...
     Raises ExtractionError if the model failed."""
+    return _extract(device_key, url, title, text)
+
+
+def extract_product(device_key: str, url: str, title: str, text: str) -> dict | None:
+    """The product on this page, or None if it isn't a (right-type) product page."""
+    return _extract(device_key, url, title, text)[1]
+
+
+def _extract(device_key: str, url: str, title: str, text: str) -> tuple[str, dict | None]:
     device = get_device(device_key)
     raw = _invoke(device, url, title, text)
+    if getattr(raw, "is_right_device_type", None) is False:
+        return "wrong_type", None
     if not raw.is_product_page:
-        return None
+        return ("listing" if getattr(raw, "is_listing_page", False) else "other"), None
+    return "product", _build_product(device, raw, url, title, text)
 
+
+def _build_product(device, raw, url: str, title: str, text: str) -> dict:
     data = raw.model_dump()
     fields, flags = device.normalize(data)
 

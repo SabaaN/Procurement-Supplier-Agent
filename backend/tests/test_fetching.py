@@ -113,7 +113,7 @@ def test_fetch_never_raises_on_network_errors():
 def test_cache_roundtrip_and_expiry():
     assert cache.get_page("https://a.test") is None
     cache.put_page("https://a.test", True, "hello", None)
-    assert cache.get_page("https://a.test") == {"url": "https://a.test", "ok": True, "text": "hello", "error": None}
+    assert cache.get_page("https://a.test") == {"url": "https://a.test", "ok": True, "text": "hello", "error": None, "links": {}}
     assert cache.get_page("https://a.test", max_age_hours=-1) is None  # expired
 
 

@@ -42,6 +42,33 @@ export const setShortlisted = (id, productId, shortlisted) =>
 export const exportUrl = (id, shortlistOnly = false) =>
   `/api/searches/${id}/export.csv${shortlistOnly ? '?shortlist_only=true' : ''}`
 
+export const datasheetUrl = (id, productId) => `/api/searches/${id}/products/${productId}/datasheet`
+
+/** Downloads a product's datasheet PDF through the backend. Resolves to the file name, or throws ApiError. */
+export async function downloadDatasheet(id, productId) {
+  const res = await fetch(datasheetUrl(id, productId))
+  if (!res.ok) {
+    let detail = res.statusText
+    try {
+      detail = (await res.json()).detail ?? detail
+    } catch {
+      /* the error body wasn't JSON */
+    }
+    throw new ApiError(res.status, detail)
+  }
+  const match = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') || '')
+  const name = match ? match[1] : 'datasheet.pdf'
+  const url = URL.createObjectURL(await res.blob())
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
+  return name
+}
+
 export const getSearches = () => request('/api/searches')
 
 export const getSearch = (id) => request(`/api/searches/${id}`)

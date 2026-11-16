@@ -74,6 +74,8 @@ class CameraExtraction(BaseModel):
     """What the LLM fills in from one page. Deliberately loose (plain strings): Python normalises it."""
 
     is_product_page: bool
+    is_listing_page: bool = False  # a shop's category / search-results page showing several products
+    is_right_device_type: bool | None = None  # see CAMERA_HINT: industrial/machine-vision, not CCTV
     title: str | None = None
     supplier: str | None = None
     part_number: str | None = None
@@ -95,7 +97,11 @@ class CameraExtraction(BaseModel):
 
 
 CAMERA_HINT = (
-    "Machine-vision / industrial camera. megapixels: sensor resolution in MP as stated; if the page only gives "
+    "Machine-vision / industrial camera. is_right_device_type: true for industrial machine-vision cameras "
+    "(area-scan or line-scan cameras for inspection, automation or measurement, usually GigE Vision, USB3 "
+    "Vision, CoaXPress or Camera Link; makers like Basler, Hikrobot, Teledyne FLIR, Daheng, IDS, JAI, Omron). "
+    "false for CCTV, security, surveillance, IP/PoE, dome or bullet cameras, DVR/NVR kits, dashcams, webcams, "
+    "action cameras and consumer photo or video cameras. megapixels: sensor resolution in MP as stated; if the page only gives "
     "pixel dimensions, fill width_px and height_px instead and leave megapixels null. fps: the maximum frame "
     "rate at full resolution. shutter: global or rolling, as written. interface: every data interface listed "
     "(e.g. GigE, USB3, CoaxPress, Camera Link). lens_mount: e.g. C, CS, S, F, M42. sensor_format: the optical "
@@ -182,6 +188,13 @@ CAMERA = DeviceDefinition(
     extraction_model=CameraExtraction,
     extraction_hint=CAMERA_HINT,
     normalize=normalize_camera,
+    search_term="machine vision camera",
+    search_hint=(
+        "The buyer wants an industrial machine-vision camera (area-scan or line-scan; GigE Vision, USB3 Vision; "
+        "makers such as Basler, Hikrobot, Teledyne FLIR, Daheng, IDS). Always say 'machine vision' or "
+        "'industrial camera' in the query, or name a maker. Never write queries that would find CCTV, security, "
+        "IP, surveillance, dashcam, webcam or consumer cameras."
+    ),
     fields=[
         FieldDef(name="min_megapixels", label="Resolution", kind="number", unit="MP"),
         FieldDef(

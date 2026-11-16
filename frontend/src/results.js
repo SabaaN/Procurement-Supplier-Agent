@@ -3,13 +3,15 @@ export const FILTERS = [
   { key: 'priced', label: 'Has price', test: (p) => p.price_buyer != null },
   { key: 'clean', label: 'No warnings', test: (p) => (p.flags ?? []).length === 0 },
   { key: 'allmet', label: 'No missed specs', test: (p) => (p.requirements_missed ?? []).length === 0 },
+  { key: 'datasheet', label: 'Has datasheet', test: (p) => Boolean(p.datasheet_url) },
+  { key: 'contact', label: 'Has contact', test: (p) => Boolean(p.email || p.contact_no) },
 ]
 
 export const SORT_OPTIONS = [
   { key: 'rank', label: 'Rank' },
   { key: 'score', label: 'Match score' },
   { key: 'price', label: 'Price' },
-  { key: 'supplier', label: 'Supplier' },
+  { key: 'supplier', label: 'Company' },
   { key: 'title', label: 'Name' },
 ]
 
@@ -17,7 +19,7 @@ const VALUE = {
   rank: (p) => p.rank,
   score: (p) => p.match_score,
   price: (p) => p.price_buyer,
-  supplier: (p) => (p.supplier || '').toLowerCase() || null,
+  supplier: (p) => (p.company_name || p.supplier || '').toLowerCase() || null,
   title: (p) => (p.title || '').toLowerCase(),
 }
 

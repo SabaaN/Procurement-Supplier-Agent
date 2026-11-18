@@ -23,7 +23,7 @@ class FakeLLM:
     def __init__(self, results):
         self.results, self.calls = list(results), 0
 
-    def with_structured_output(self, model):
+    def with_structured_output(self, model, **kwargs):
         return self
 
     def invoke(self, messages):
@@ -97,7 +97,7 @@ def test_non_product_page_returns_none(monkeypatch):
 
 def test_llm_failure_is_retried_once(monkeypatch):
     llm = FakeLLM([RuntimeError("429 rate limit"), good_extraction()])
-    monkeypatch.setattr(extractor, "_llm", lambda: llm)
+    monkeypatch.setattr(extractor, "_llm", lambda *a: llm)
     monkeypatch.setattr(extractor.time, "sleep", lambda s: None)
     assert real_extract_product("camera", "https://a.test/p", "", TEXT)["title"] == "Acme AC-500"
     assert llm.calls == 2
@@ -105,7 +105,7 @@ def test_llm_failure_is_retried_once(monkeypatch):
 
 def test_llm_failing_twice_raises_extraction_error(monkeypatch):
     llm = FakeLLM([RuntimeError("down"), RuntimeError("still down")])
-    monkeypatch.setattr(extractor, "_llm", lambda: llm)
+    monkeypatch.setattr(extractor, "_llm", lambda *a: llm)
     monkeypatch.setattr(extractor.time, "sleep", lambda s: None)
     with pytest.raises(ExtractionError):
         real_extract_product("camera", "https://a.test/p", "", TEXT)

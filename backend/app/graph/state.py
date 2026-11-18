@@ -18,3 +18,4 @@ class SearchState(TypedDict, total=False):
     ranked: list[dict]  # final, sorted by match_score
     attempts: int  # how many times queries have been planned
     error: str | None
+    llm_limited: str | None  # set when Groq's daily limit stopped page reading: no further attempts

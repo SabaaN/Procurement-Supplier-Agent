@@ -1,10 +1,11 @@
 """Shared fixtures. Every test runs with Groq, Tavily, page fetching and extraction faked, and a temp cache DB."""
 import pytest
-from app.devices.camera import CAMERA
-from app.services import cache, explainer, extractor, fx, page_fetcher, query_planner, web_search
+from app.devices import get_device
+from app.services import cache, explainer, extractor, fx, llm, page_fetcher, query_planner, web_search
 
 @pytest.fixture(autouse=True)
 def fake_services(monkeypatch, tmp_path):
+    llm.reset_limits()  # no model starts a test marked as out for the day
     def fake_plan(device_key, criteria, attempt, previous=()):
         # 1 query on the first attempt, 2 on later ones (broader)
         n = 1 if attempt == 1 else 2
@@ -24,7 +25,7 @@ def fake_services(monkeypatch, tmp_path):
 
     def fake_extract(device_key, url, title, text):
         i = ids.setdefault(url, len(ids))
-        return CAMERA.stub_spec(i, url).model_dump(mode="json")
+        return get_device(device_key).stub_spec(i, url).model_dump(mode="json")
 
     def no_llm(facts):
         raise RuntimeError("LLM disabled in tests")

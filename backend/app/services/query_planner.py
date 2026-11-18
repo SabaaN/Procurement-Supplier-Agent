@@ -4,13 +4,12 @@ Primary path: a small Groq model writes the queries.
 Fallback: plain template queries, so a Groq error or rate limit never stops a search.
 """
 import logging
-from functools import lru_cache
 
 from pydantic import BaseModel, Field
 
 from ..config import settings
 from ..devices import get_device
-from .llm import structured_invoke
+from . import llm
 
 log = logging.getLogger(__name__)
 
@@ -48,7 +47,7 @@ def spec_items(device, criteria: dict) -> list[dict]:
             term = f"{vtxt}{unit}".replace(" / ", " ")
             if f.kind in ("select", "multiselect"):
                 term += f" {f.label.lower()}"
-        op = "at least " if f.name.startswith("min_") else ""
+        op = "at least " if f.name.startswith("min_") else "at most " if f.name.startswith("max_") else ""
         flexible = bool(req.get("flexible"))
         items.append(
             {
@@ -111,19 +110,16 @@ def _prompt(device, items: list[dict], criteria: dict, attempt: int, previous) -
     return "\n\n".join(parts)
 
 
-@lru_cache(maxsize=1)
-def _llm():
-    from langchain_groq import ChatGroq
-
+def _llm(model: str | None = None):
     # Reads GROQ_API_KEY from the environment (loaded from .env by app.config).
-    return ChatGroq(model=settings.groq_model_small, temperature=0.2, max_retries=2)
+    return llm.chat(model or settings.groq_model_small, 0.2)
 
 
 def _llm_queries(device, items, criteria, attempt, previous) -> list[str]:
     if not settings.groq_api_key:
         raise RuntimeError("GROQ_API_KEY is not set (add it to backend/.env)")
     messages = [("system", SYSTEM), ("human", _prompt(device, items, criteria, attempt, previous))]
-    plan = structured_invoke(_llm(), QueryPlan, messages)
+    plan = llm.call(settings.groq_model_small, QueryPlan, messages, client_for=_llm)
     return plan.queries
 
 

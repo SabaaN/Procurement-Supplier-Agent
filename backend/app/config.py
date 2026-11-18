@@ -59,6 +59,11 @@ class Settings:
 
     # cache
     cache_ttl_hours: float = 24
+    # Reasoning models (gpt-oss) think before answering, and those hidden tokens count towards the
+    # daily limit. "low" is plenty for reading specs off a page; "" sends nothing (Groq's default).
+    groq_reasoning_effort: str = os.getenv("GROQ_REASONING_EFFORT", "low")
+    # Used when a model hits its daily limit; it has its own allowance. "" turns the backup off.
+    groq_fallback_model: str = os.getenv("GROQ_FALLBACK_MODEL", "openai/gpt-oss-120b")
     extract_retry_wait: float = 5.0  # seconds to wait before retrying a failed Groq call
     db_path: Path = BACKEND_DIR / "data" / "app.db"
 

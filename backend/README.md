@@ -28,6 +28,8 @@ tests/
 
 | Variable | Default | What it does |
 |---|---|---|
+| `GROQ_REASONING_EFFORT` | `low` | For gpt-oss models: how much hidden reasoning before each answer. Those tokens count towards Groq's daily limit, and reading specs off a page needs little. `medium`/`high` for more care, empty for Groq's default. |
+| `GROQ_FALLBACK_MODEL` | `openai/gpt-oss-120b` | When a model hits Groq's daily token limit, calls move to this one (it has its own allowance). When every model is out, the search stops reading pages, keeps what it has, and says when to try again. Empty turns the backup off. |
 | `MAX_PAGES_PER_ATTEMPT` | `12` | Pages read per search attempt (up to 3 attempts). More pages = more results, but each page is one Groq call; lower it if the progress panel shows many "failed" extractions. |
 | `FLEXIBLE_TOLERANCE` | `0.2` | How far short a **Flexible** number may be: `0.2` means 5 MP flexible accepts 4 MP and up. |
 | `BUDGET_TOLERANCE` | `0.15` | With **Flexible budget** ticked, products up to 15% over the maximum are kept, flagged. |
@@ -51,3 +53,18 @@ Every spec in the form has three levels:
 
 Searches look for **industrial / machine-vision cameras** only; CCTV, security and consumer cameras
 are recognised on the page and skipped ("wrong kind of product" in the progress panel).
+
+### Device types
+
+**Camera**: industrial / machine-vision cameras. **Encoder**: industrial rotary encoders (incremental or
+absolute, solid or hollow shaft). Video encoders, hobby rotary knobs (KY-040, EC11) and linear encoders are
+recognised on the page and skipped as "wrong kind of product".
+
+Encoder specs: encoder type, resolution (PPR for incremental, single-turn bits for absolute), multi-turn,
+output / interface, shaft type, shaft or bore diameter, housing diameter (a maximum: the space it must fit),
+your supply voltage (kept when it falls inside the encoder's range), max speed and IP rating.
+
+To add another device, write a module like `app/devices/encoder.py` (criteria, spec, extraction model,
+normalisation, checks, form fields) and register it in `app/devices/__init__.py`. Its checks use the
+comparisons in `app/devices/compare.py`; the search, filter, ranking, form and CSV pick it up automatically.
+Add its key specs to `frontend/src/devices.js` for the results table.

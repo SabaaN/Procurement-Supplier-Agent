@@ -75,6 +75,8 @@ def main():
         state.update(nodes.convert_prices(state))
     except Exception as e:  # e.g. no internet for exchange rates
         print(f"  (could not convert currencies: {e})")
+    from app.devices import get_device
+    device_checks = get_device(device).checks
     out = nodes.filter_products(state)
     reasons = {d["title"]: "; ".join(d["reasons"]) for d in out["dropped"]}
 
@@ -85,7 +87,9 @@ def main():
         price = f"{p.get('price')} {p.get('currency') or '?'}"
         if p.get("price_buyer") is not None and p.get("currency") != state["criteria"].get("currency"):
             price += f" (= {p['price_buyer']:,.0f} {state['criteria'].get('currency')})"
-        print(f"  - {short(p.get('title'))}\n      price {price} | {p.get('megapixels')} MP | {p.get('fps')} fps"
+        specs = " | ".join(f"{label}: {p.get(f) if not isinstance(f, tuple) else '-'.join(str(p.get(x)) for x in f)}"
+                           for f, _cmp, label in device_checks.values())
+        print(f"  - {short(p.get('title'))}\n      price {price} | {specs}"
               f"\n      {verdict}\n      {p.get('source_url')}")
     print(f"\n  {len(out['candidates'])} of {len(products)} would be kept now.")
 

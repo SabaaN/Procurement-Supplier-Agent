@@ -7,13 +7,12 @@ import logging
 import re
 import time
 from datetime import datetime, timezone
-from functools import lru_cache
 
 from pydantic import ValidationError
 
 from ..config import settings
 from ..devices import get_device
-from .llm import structured_invoke
+from . import llm
 
 log = logging.getLogger(__name__)
 
@@ -43,13 +42,10 @@ SYSTEM = (
 )
 
 
-@lru_cache(maxsize=1)
-def _llm():
+def _llm(model: str | None = None):
     if not settings.groq_api_key:
         raise ExtractionError("GROQ_API_KEY is not set (add it to backend/.env)")
-    from langchain_groq import ChatGroq
-
-    return ChatGroq(model=settings.groq_model_small, temperature=0, max_retries=2)
+    return llm.chat(model or settings.groq_model_small, 0.0)
 
 
 def _prompt(device, url: str, title: str, text: str) -> str:
@@ -63,18 +59,20 @@ def _prompt(device, url: str, title: str, text: str) -> str:
 
 
 def _invoke(device, url: str, title: str, text: str):
-    """One structured Groq call, retried once. Returns an instance of device.extraction_model."""
-    llm = _llm()
+    """One structured Groq call, retried once. Returns an instance of device.extraction_model.
+    Raises llm.DailyLimitReached (not retried) when every model is out for the day."""
     messages = [("system", SYSTEM), ("human", _prompt(device, url, title, text))]
     last = None
     for attempt in range(2):
         try:
-            return structured_invoke(llm, device.extraction_model, messages)
-        except Exception as e:  # rate limit, bad tool output, network...
+            return llm.call(settings.groq_model_small, device.extraction_model, messages, client_for=_llm)
+        except llm.DailyLimitReached:
+            raise
+        except Exception as e:  # per-minute rate limit, bad tool output, network...
             last = e
             log.warning("Extraction attempt %d failed for %s: %s: %s", attempt + 1, url, type(e).__name__, e)
             if attempt == 0:
-                time.sleep(settings.extract_retry_wait)
+                time.sleep(llm.per_minute_wait(e) or settings.extract_retry_wait)
     raise ExtractionError(f"{type(last).__name__}: {last}") from last
 
 

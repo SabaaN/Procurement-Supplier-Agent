@@ -1,7 +1,4 @@
 """Camera (machine vision / industrial) criteria, product spec and form definition."""
-from typing import Literal, get_args
-
-from pydantic import PositiveFloat, PositiveInt
 import re
 from typing import Literal, get_args
 
@@ -15,6 +12,7 @@ from .base import (
     Req,
     SharedCriteria,
 )
+from .compare import any_overlap, at_least, equals, one_of
 
 Shutter = Literal["global", "rolling"]
 Colour = Literal["colour", "mono"]
@@ -179,6 +177,22 @@ def normalize_camera(raw: dict) -> tuple[dict, list[str]]:
         flags.append(f"interface: unrecognised value {raw['interface']!r}")
     return out, flags
 
+# criteria field -> (product spec field, comparison, label)
+CAMERA_CHECKS = {
+    "min_megapixels": ("megapixels", at_least, "Resolution"),
+    "min_fps": ("fps", at_least, "Frame rate"),
+    "shutter": ("shutter", equals, "Shutter type"),
+    "colour": ("colour", equals, "Colour"),
+    "scan_type": ("scan_type", equals, "Scan type"),
+    "sensor_format": ("sensor_format", one_of, "Sensor format"),
+    "interface": ("interface", any_overlap, "Interface"),
+    "lens_mount": ("lens_mount", one_of, "Lens mount"),
+    "min_bit_depth": ("bit_depth", at_least, "Bit depth"),
+    "hardware_trigger": ("hardware_trigger", equals, "Hardware trigger"),
+}
+CAMERA_UNITS = {"min_megapixels": "MP", "min_fps": "fps", "min_bit_depth": "bit"}
+
+
 CAMERA = DeviceDefinition(
     key="camera",
     label="Camera",
@@ -188,6 +202,8 @@ CAMERA = DeviceDefinition(
     extraction_model=CameraExtraction,
     extraction_hint=CAMERA_HINT,
     normalize=normalize_camera,
+    checks=CAMERA_CHECKS,
+    units=CAMERA_UNITS,
     search_term="machine vision camera",
     search_hint=(
         "The buyer wants an industrial machine-vision camera (area-scan or line-scan; GigE Vision, USB3 Vision; "

@@ -37,6 +37,7 @@ export default function SearchForm({ onStarted }) {
     setForm(null)
     setValues({})
     setLevels({})
+    setFlexibleBudget(false)
     setErrors({})
     getDeviceForm(device)
       .then((f) => !cancelled && setForm(f))

@@ -8,14 +8,13 @@ model can phrase things but never introduces a spec or a price.
 import json
 import logging
 import re
-from functools import lru_cache
 
 from pydantic import BaseModel
 
 from ..config import settings
 from ..devices import get_device
 from ..devices.base import ProductBase
-from .llm import structured_invoke
+from . import llm
 
 log = logging.getLogger(__name__)
 
@@ -102,19 +101,16 @@ def template_explanation(p: dict, rank: int, total: int, criteria: dict) -> str:
     return " ".join(parts)
 
 
-@lru_cache(maxsize=1)
-def _llm():
+def _llm(model: str | None = None):
     if not settings.groq_api_key:
         raise RuntimeError("GROQ_API_KEY is not set (add it to backend/.env)")
-    from langchain_groq import ChatGroq
-
-    return ChatGroq(model=settings.groq_model_large, temperature=0.2, max_retries=2)
+    return llm.chat(model or settings.groq_model_large, 0.2)
 
 
 def _llm_explanations(facts: list[dict]) -> dict[int, str]:
     """One Groq call for the whole shortlist. Returns {rank: text}."""
     messages = [("system", SYSTEM), ("human", json.dumps(facts, ensure_ascii=False, indent=1))]
-    result = structured_invoke(_llm(), ExplanationSet, messages)
+    result = llm.call(settings.groq_model_large, ExplanationSet, messages, client_for=_llm)
     return {item.rank: item.text for item in result.items}
 
 

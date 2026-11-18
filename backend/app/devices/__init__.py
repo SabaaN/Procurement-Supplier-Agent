@@ -1,8 +1,9 @@
 """Device registry: the single place that lists which device types exist."""
 from .base import DeviceDefinition
 from .camera import CAMERA
+from .encoder import ENCODER
 
-DEVICES: dict[str, DeviceDefinition] = {CAMERA.key: CAMERA}
+DEVICES: dict[str, DeviceDefinition] = {CAMERA.key: CAMERA, ENCODER.key: ENCODER}
 
 # Shown in the dropdown but not selectable yet.
 COMING_SOON = {"sensor": "Sensor", "plc": "PLC"}

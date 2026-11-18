@@ -6,6 +6,11 @@
   padding: var(--space-3) var(--space-4);
 }
 
+.summary > .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .summary__main {
   display: flex;
   flex-wrap: wrap;

@@ -136,7 +136,7 @@ def test_api_accepts_flexible_criteria():
     (dict(is_product_page=True, is_right_device_type=True, title="Basler ace"), "product"),
 ])
 def test_extract_page_kinds(monkeypatch, fields, kind):
-    monkeypatch.setattr(extractor, "_llm", lambda: FakeLLM([CameraExtraction(**fields)]))
+    monkeypatch.setattr(extractor, "_llm", lambda *a: FakeLLM([CameraExtraction(**fields)]))
     got_kind, product = real_extract_page("camera", "https://a.test/p", "", "some page text")
     assert got_kind == kind and (product is not None) == (kind == "product")
 
@@ -211,3 +211,12 @@ def test_budget_order_error_names_a_field_the_form_can_highlight():
                                            "criteria": {"budget_min": 150000, "budget_max": 100000}})
     assert r.status_code == 422
     assert r.json()["detail"] == [{"field": "budget_max", "message": "Budget max must be at least Budget min"}]
+
+
+def test_exact_matches_rank_above_cheaper_close_matches():
+    c = {**FLEX, "budget_min": None, "budget_max": None}
+    products = [cam(title="close but cheap", megapixels=4.5, price=50000), cam(title="exact but dearer", price=140000)]
+    out = nodes.filter_products({"criteria": c, "products": products})
+    scored = scoring.score_products(c, out["candidates"])
+    ranked = nodes.finalize({"criteria": c, "candidates": scored, "device_type": "camera"})["ranked"]
+    assert [p["title"] for p in ranked] == ["exact but dearer", "close but cheap"]

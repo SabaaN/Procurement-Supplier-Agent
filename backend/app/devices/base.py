@@ -117,5 +117,8 @@ class DeviceDefinition:
     search_term: str = ""
     search_hint: str = ""
     normalize: Callable[[dict], tuple[dict, list[str]]] | None = None
+    # Requirement checks: criteria field -> (spec field or tuple of fields, comparison, label), see compare.py.
+    checks: dict = field(default_factory=dict)
+    units: dict = field(default_factory=dict)  # criteria field -> unit shown in close-match notes
     # Used only by tests, to fake products without calling Groq.
     stub_spec: Callable[[int, str], ProductBase] | None = None

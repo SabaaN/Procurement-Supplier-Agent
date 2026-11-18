@@ -59,7 +59,8 @@ export function summarizeCriteria(criteria, fields) {
     if (!f.has_required_toggle || !c) continue
     let text
     if (f.kind === 'number') {
-      const prefix = f.name.startsWith('min_') ? (c.flexible ? '≈ ' : '≥ ') : ''
+      const bound = f.name.startsWith('min_') ? '≥ ' : f.name.startsWith('max_') ? '≤ ' : ''
+      const prefix = bound && c.flexible ? '≈ ' : bound
       text = `${f.label} ${prefix}${number(c.value)}${f.unit ? ` ${f.unit}` : ''}`
     } else if (f.kind === 'multiselect') {
       text = `${f.label}: ${c.value.join(' / ')}`

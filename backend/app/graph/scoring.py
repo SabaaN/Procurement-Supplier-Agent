@@ -1,5 +1,5 @@
 """Match score from 0 to 100 in plain Python: reproducible and explainable, no LLM."""
-from .checks import CAMERA_CHECKS
+from ..devices.camera import CAMERA_CHECKS
 
 WEIGHTS = {"preferences": 50, "price": 30, "confidence": 20}
 FLAG_PENALTY = 0.25  # each data-quality flag removes this share of the confidence component
@@ -14,7 +14,7 @@ def preference_share(criteria: dict, product: dict, checks=CAMERA_CHECKS) -> flo
     labels = [
         label
         for name, (_spec, _compare, label) in checks.items()
-        if (req := criteria.get(name)) and (req.get("flexible") or not req["required"])
+        if (req := criteria.get(name)) and (req.get("flexible") or not req.get("required"))
     ]
     if not labels:
         return None

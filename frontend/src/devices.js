@@ -5,6 +5,15 @@ export const KEY_SPECS = {
     { key: 'shutter', format: (v) => `${v} shutter` },
     { key: 'interface', format: (v) => v.join(' / ') },
   ],
+  encoder: [
+    { key: 'encoder_type', format: (v) => v },
+    { key: 'ppr', format: (v) => `${v} PPR` },
+    { key: 'resolution_bits', format: (v) => `${v}-bit` },
+    { key: 'multiturn', format: (v) => (v ? 'multi-turn' : 'single-turn') },
+    { key: 'shaft_type', format: (v) => `${v} shaft` },
+    { key: 'shaft_diameter_mm', format: (v) => `Ø${v} mm` },
+    { key: 'output', format: (v) => v.join(' / ') },
+  ],
 }
 
 /** The spec texts to show for one product, skipping anything the page didn't state. */

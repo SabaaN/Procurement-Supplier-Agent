@@ -14,7 +14,7 @@ from ..services import query_planner, web_search
 from .checks import check_product
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from ..config import settings
-from ..services import cache, contacts, explainer, extractor, fx, page_fetcher, query_planner, web_search
+from ..services import cache, contacts, explainer, extractor, fx, llm, page_fetcher, query_planner, web_search
 from . import scoring
 
 MIN_RESULTS = 5  # fewer survivors than this -> plan broader queries
@@ -51,8 +51,10 @@ def finalize(state: SearchState) -> dict:
 
     def sort_key(p):
         cost = p.get("price_buyer") if p.get("price_buyer") is not None else p.get("price")
-        # closest matches: fewest misses first, then score
-        return (len(p.get("misses", [])), -(p.get("match_score") or 0), cost if cost is not None else float("inf"))
+        # exact matches first, then close (flexible) matches, then closest-but-failing (fewest misses
+        # first); the score orders products within each group
+        return (len(p.get("misses", [])), bool(p.get("requirements_close")),
+                -(p.get("match_score") or 0), cost if cost is not None else float("inf"))
 
     ranked = sorted(state.get("candidates", []), key=sort_key)
     texts, source = explainer.explain(state.get("device_type"), state.get("criteria", {}), ranked)
@@ -141,18 +143,28 @@ def fetch_clean(state: SearchState) -> dict:
     return {"pages": pages + new}
 
 
-def _extract_pages(device_key: str, pages: list[dict], label: str = "page") -> tuple[list, Counter, str]:
-    """Run (or reuse cached) extraction on each page. Returns ([(page, kind, product)], kind counts, last error)."""
+def _extract_pages(device_key: str, pages: list[dict], label: str = "page") -> tuple[list, Counter, str, str | None]:
+    """Run (or reuse cached) extraction on each page.
+    Returns ([(page, kind, product)], kind counts, last error, daily-limit message or None).
+    Once Groq's daily limit is reached, the remaining pages are read from the cache only."""
     key = extractor.cache_key(device_key)
-    out, counts, last_error = [], Counter(), ""
+    out, counts, last_error, limited = [], Counter(), "", None
     for i, page in enumerate(pages, 1):
         emit("extract", "running", f"Extracting specs from {label} {i} of {len(pages)}", done=i, total=len(pages))
         cached = cache.get_extraction(page["url"], key)
         if cached is not None:
             kind, product = cached["kind"], cached["product"]
+        elif limited:
+            counts["not_read"] += 1
+            continue
         else:
             try:
                 kind, product = extractor.extract_page(device_key, page["url"], page.get("title", ""), page["text"])
+            except llm.DailyLimitReached as e:
+                limited = str(e)
+                counts["not_read"] += 1
+                emit("extract", "running", f"{limited}. Reading only pages seen before.")
+                continue
             except extractor.ExtractionError as e:
                 counts["failed"] += 1
                 last_error = str(e)
@@ -163,7 +175,7 @@ def _extract_pages(device_key: str, pages: list[dict], label: str = "page") -> t
             # contacts and datasheet come from the page's links, so cached extractions get them too
             product = contacts.enrich(product, page.get("links"))
         out.append((page, kind, product))
-    return out, counts, last_error
+    return out, counts, last_error, limited
 
 
 def _listing_links(results: list, known: set[str]) -> list[str]:
@@ -179,7 +191,7 @@ def _listing_links(results: list, known: set[str]) -> list[str]:
 
 def _kind_summary(counts: Counter) -> str:
     names = [("listing", "listing pages"), ("wrong_type", "wrong kind of product"),
-             ("other", "not product pages"), ("failed", "failed")]
+             ("other", "not product pages"), ("failed", "failed"), ("not_read", "not read: daily limit")]
     return ", ".join(f"{counts[k]} {name}" for k, name in names if counts[k]) or "nothing else"
 
 
@@ -189,27 +201,33 @@ def extract(state: SearchState) -> dict:
     device_key = state["device_type"]
     pages = list(state["pages"])
     ok_pages = [p for p in pages if p["ok"]]  # skip pages that failed to download
-    results, counts, last_error = _extract_pages(device_key, ok_pages)
+    results, counts, last_error, limited = _extract_pages(device_key, ok_pages)
 
-    if ok_pages and counts["failed"] == len(ok_pages):  # the model never worked: stop instead of looping
+    if ok_pages and not limited and counts["failed"] == len(ok_pages):  # the model never worked: stop instead of looping
         emit("extract", "failed", f"Extraction failed: {last_error}")
         return {"products": [], "error": f"Extraction failed: {last_error}"}
 
     urls = list(state.get("urls", []))
-    follow = _listing_links(results, set(urls) | {p["url"] for p in pages})
+    follow = [] if limited else _listing_links(results, set(urls) | {p["url"] for p in pages})
     if follow:
         emit("extract", "running", f"Following {len(follow)} product links from {counts['listing']} listing pages")
         titles = {u: "" for u in follow}
         followed = _fetch(follow, titles, label="product links")
         pages += followed
         urls += follow
-        more, more_counts, _ = _extract_pages(device_key, [p for p in followed if p["ok"]], label="linked page")
+        more, more_counts, _, limited = _extract_pages(device_key, [p for p in followed if p["ok"]], label="linked page")
         results += more
         counts.update(more_counts)
 
     products = [product for _, kind, product in results if product is not None]
+    if limited and not products:
+        emit("extract", "failed", f"{limited}. No products could be read.")
+        return {"products": [], "pages": pages, "urls": urls, "error": limited}
     emit("extract", "done", f"{len(products)} products extracted ({_kind_summary(counts)})")
-    return {"products": products, "pages": pages, "urls": urls}
+    out = {"products": products, "pages": pages, "urls": urls}
+    if limited:
+        out["llm_limited"] = limited  # stop widening: further attempts could not be read either
+    return out
 
 
 def convert_prices(state: SearchState) -> dict:
@@ -248,6 +266,7 @@ def filter_products(state: SearchState) -> dict:
     aside with their reasons, so the closest ones can be shown when nothing matches fully.
     """
     c = state["criteria"]
+    device = get_device(state.get("device_type") or "camera")
     lo, hi = c.get("budget_min"), c.get("budget_max")
     buyer_cur = c.get("currency")
     kept, dropped = [], []
@@ -277,7 +296,8 @@ def filter_products(state: SearchState) -> dict:
             if lo and price_buyer < lo * settings.cheap_ratio:
                 flags.append("unusually cheap for your budget: check it is genuine and the right type")
 
-        verdict = check_product(c, p, strict=settings.strict_requirements, tolerance=settings.flexible_tolerance)
+        verdict = check_product(c, p, checks=device.checks, units=device.units,
+                                strict=settings.strict_requirements, tolerance=settings.flexible_tolerance)
         reasons += verdict["dropped_for"]
         flags += [f"{label}: not found on page" for label in verdict["unknown"]]
         product = {
@@ -314,8 +334,9 @@ def _drop_summary(dropped: list[dict]) -> str:
 
 def route_after_filter(state: SearchState) -> str:
     """Too few survivors -> plan broader queries, unless we've already tried enough."""
-    if state.get("error") or len(state["candidates"]) >= MIN_RESULTS or state["attempts"] >= MAX_ATTEMPTS:
-        return "score"  # also stop when a step failed outright (e.g. Tavily key missing)
+    if (state.get("error") or state.get("llm_limited") or len(state["candidates"]) >= MIN_RESULTS
+            or state["attempts"] >= MAX_ATTEMPTS):
+        return "score"  # also stop when a step failed outright, or Groq's daily limit stopped reading
     return "plan_queries"
 
 
@@ -336,7 +357,8 @@ def score(state: SearchState) -> dict:
         candidates = closest_matches(state["dropped"], settings.closest_matches)
         if candidates:
             emit("rank", "running", f"No exact matches: showing the {len(candidates)} closest")
-    scored = scoring.score_products(state["criteria"], candidates)
+    checks = get_device(state.get("device_type") or "camera").checks
+    scored = scoring.score_products(state["criteria"], candidates, checks)
     for p in scored:  # a closest match loses points for each thing it misses
         if p.get("near_miss"):
             p["match_score"] = max(0.0, round(p["match_score"] - NEAR_MISS_PENALTY * len(p["misses"]), 1))

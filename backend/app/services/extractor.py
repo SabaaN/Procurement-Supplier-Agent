@@ -13,6 +13,7 @@ from pydantic import ValidationError
 
 from ..config import settings
 from ..devices import get_device
+from .llm import structured_invoke
 
 log = logging.getLogger(__name__)
 
@@ -63,12 +64,12 @@ def _prompt(device, url: str, title: str, text: str) -> str:
 
 def _invoke(device, url: str, title: str, text: str):
     """One structured Groq call, retried once. Returns an instance of device.extraction_model."""
-    structured = _llm().with_structured_output(device.extraction_model)
+    llm = _llm()
     messages = [("system", SYSTEM), ("human", _prompt(device, url, title, text))]
     last = None
     for attempt in range(2):
         try:
-            return structured.invoke(messages)
+            return structured_invoke(llm, device.extraction_model, messages)
         except Exception as e:  # rate limit, bad tool output, network...
             last = e
             log.warning("Extraction attempt %d failed for %s: %s: %s", attempt + 1, url, type(e).__name__, e)

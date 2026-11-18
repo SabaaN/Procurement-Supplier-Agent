@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from ..config import settings
 from ..devices import get_device
+from .llm import structured_invoke
 
 log = logging.getLogger(__name__)
 
@@ -121,8 +122,8 @@ def _llm():
 def _llm_queries(device, items, criteria, attempt, previous) -> list[str]:
     if not settings.groq_api_key:
         raise RuntimeError("GROQ_API_KEY is not set (add it to backend/.env)")
-    structured = _llm().with_structured_output(QueryPlan)
-    plan = structured.invoke([("system", SYSTEM), ("human", _prompt(device, items, criteria, attempt, previous))])
+    messages = [("system", SYSTEM), ("human", _prompt(device, items, criteria, attempt, previous))]
+    plan = structured_invoke(_llm(), QueryPlan, messages)
     return plan.queries
 
 

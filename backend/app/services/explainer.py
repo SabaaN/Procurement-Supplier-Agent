@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from ..config import settings
 from ..devices import get_device
 from ..devices.base import ProductBase
+from .llm import structured_invoke
 
 log = logging.getLogger(__name__)
 
@@ -112,8 +113,8 @@ def _llm():
 
 def _llm_explanations(facts: list[dict]) -> dict[int, str]:
     """One Groq call for the whole shortlist. Returns {rank: text}."""
-    structured = _llm().with_structured_output(ExplanationSet)
-    result = structured.invoke([("system", SYSTEM), ("human", json.dumps(facts, ensure_ascii=False, indent=1))])
+    messages = [("system", SYSTEM), ("human", json.dumps(facts, ensure_ascii=False, indent=1))]
+    result = structured_invoke(_llm(), ExplanationSet, messages)
     return {item.rank: item.text for item in result.items}
 
 

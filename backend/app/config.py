@@ -14,10 +14,10 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 class Settings:
     groq_api_key: str | None = os.getenv("GROQ_API_KEY")
     tavily_api_key: str | None = os.getenv("TAVILY_API_KEY")
-    groq_model_small: str = os.getenv("GROQ_MODEL_SMALL", "llama-3.1-8b-instant")
+    groq_model_small: str = os.getenv("GROQ_MODEL_SMALL", "openai/gpt-oss-20b")
     max_queries: int = 4  # per attempt; keeps Tavily credits and Groq tokens low
     results_per_query: int = 5
-    groq_model_large: str = os.getenv("GROQ_MODEL_LARGE", "llama-3.3-70b-versatile")
+    groq_model_large: str = os.getenv("GROQ_MODEL_LARGE", "openai/gpt-oss-120b")
     explain_top_n: int = 10  # only the top N products are sent to the model for explanations
 
     # page fetching
@@ -35,6 +35,17 @@ class Settings:
     # filtering. Off: a required spec the page doesn't mention keeps the product, flagged and ranked
     # lower. On (STRICT_REQUIREMENTS=1): such products are dropped, as before.
     strict_requirements: bool = os.getenv("STRICT_REQUIREMENTS", "0").lower() in ("1", "true", "yes")
+
+    # sites that never sell the product: their links are dropped before any page is read
+    skip_domains: tuple[str, ...] = tuple(
+        d.strip().lower()
+        for d in os.getenv(
+            "SKIP_DOMAINS",
+            "youtube.com,youtu.be,facebook.com,instagram.com,tiktok.com,twitter.com,x.com,linkedin.com,"
+            "pinterest.com,reddit.com,quora.com,wikipedia.org,medium.com",
+        ).split(",")
+        if d.strip()
+    )
 
     # how far "Flexible" stretches
     flexible_tolerance: float = float(os.getenv("FLEXIBLE_TOLERANCE", "0.2"))  # 5 MP flexible accepts 4 MP

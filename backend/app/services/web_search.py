@@ -1,5 +1,6 @@
 """Web search through Tavily. Returns plain dicts so nodes and tests don't depend on the SDK."""
 from functools import lru_cache
+from urllib.parse import urlsplit
 
 from ..config import settings
 
@@ -24,6 +25,7 @@ def search_web(query: str, max_results: int | None = None) -> list[dict]:
             query=query,
             max_results=max_results or settings.results_per_query,
             search_depth="basic",
+            exclude_domains=list(settings.skip_domains),
         )
     except SearchError:
         raise
@@ -38,5 +40,11 @@ def search_web(query: str, max_results: int | None = None) -> list[dict]:
             "score": r.get("score"),
         }
         for r in response.get("results", [])
-        if r.get("url")
+        if r.get("url") and not is_skipped(r["url"])
     ]
+
+
+def is_skipped(url: str) -> bool:
+    """Video, social and encyclopedia sites: they don't sell the product, so reading them wastes a Groq call."""
+    host = urlsplit(url).netloc.lower().split(":")[0].removeprefix("www.").removeprefix("m.")
+    return any(host == d or host.endswith("." + d) for d in settings.skip_domains)

@@ -20,7 +20,7 @@ class QueryPlan(BaseModel):
 
 SYSTEM = (
     "You write web search queries that find shop pages where a buyer can see the price of, and buy, "
-    "the industrial equipment they want: product pages and shop category pages from distributors and "
+    "the equipment they want: product pages and shop category pages from distributors and "
     "online stores. Do not write queries for datasheets, PDFs, manuals, reviews or news. "
     "Return 3 to 5 distinct, short queries, each written the way a person would type it into a search "
     "engine. Use only the specs you are given. Never invent specs, models or prices."
@@ -72,6 +72,13 @@ def fallback_queries(device, items: list[dict], attempt: int, criteria: dict | N
         terms = " ".join(required or nice[:2])
     else:
         terms = " ".join(required[: max(1, len(required) - (attempt - 1))] if required else [])
+    if device.key == "camera":
+        # Keep industrial machine vision prominent while opening the fallback to everyday cameras too.
+        bases = ["machine vision camera", "industrial camera", "digital camera", "video camera"]
+        queries = [f"{base} {terms} price" for base in bases]
+        if market:
+            queries[0] = f"machine vision camera {terms} price in {market}"
+        return [" ".join(q.split()) for q in queries[: settings.max_queries]]
     queries = [f"{name} {terms} price", f"{name} {terms} buy online"]
     if market:
         queries.insert(0, f"{name} {terms} price in {market}")

@@ -51,12 +51,12 @@ Every spec in the form has three levels:
   Flexible specs are left out of the web searches, so pages for nearby values are found too.
 - **Nice to have**: only affects the ranking.
 
-Searches look for **industrial / machine-vision cameras** only; CCTV, security and consumer cameras
-are recognised on the page and skipped ("wrong kind of product" in the progress panel).
+Camera searches prioritize **industrial / machine-vision cameras** and also include ordinary digital,
+photo/video, webcam, action and CCTV/security cameras. Camera products from any of these categories can be returned.
 
 ### Device types
 
-**Camera**: industrial / machine-vision cameras. **Encoder**: industrial rotary encoders (incremental or
+**Camera**: all camera categories, with industrial / machine-vision cameras prioritized. **Encoder**: industrial rotary encoders (incremental or
 absolute, solid or hollow shaft). Video encoders, hobby rotary knobs (KY-040, EC11) and linear encoders are
 recognised on the page and skipped as "wrong kind of product".
 

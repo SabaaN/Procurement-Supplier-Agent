@@ -95,11 +95,12 @@ class CameraExtraction(BaseModel):
 
 
 CAMERA_HINT = (
-    "Machine-vision / industrial camera. is_right_device_type: true for industrial machine-vision cameras "
-    "(area-scan or line-scan cameras for inspection, automation or measurement, usually GigE Vision, USB3 "
-    "Vision, CoaXPress or Camera Link; makers like Basler, Hikrobot, Teledyne FLIR, Daheng, IDS, JAI, Omron). "
-    "false for CCTV, security, surveillance, IP/PoE, dome or bullet cameras, DVR/NVR kits, dashcams, webcams, "
-    "action cameras and consumer photo or video cameras. megapixels: sensor resolution in MP as stated; if the page only gives "
+    "Camera of any kind. is_right_device_type: true for a page about a camera that captures still images or video, "
+    "including industrial machine-vision cameras (area-scan or line-scan cameras for inspection, automation or "
+    "measurement, usually GigE Vision, USB3 Vision, CoaXPress or Camera Link; makers like Basler, Hikrobot, "
+    "Teledyne FLIR, Daheng, IDS, JAI, Omron), digital/photo/video cameras, webcams, action cameras, and CCTV/security "
+    "cameras. false only for a page that is not selling/describing a camera product (for example a lens, DVR/NVR alone, "
+    "or unrelated equipment). megapixels: sensor resolution in MP as stated; if the page only gives "
     "pixel dimensions, fill width_px and height_px instead and leave megapixels null. fps: the maximum frame "
     "rate at full resolution. shutter: global or rolling, as written. interface: every data interface listed "
     "(e.g. GigE, USB3, CoaxPress, Camera Link). lens_mount: e.g. C, CS, S, F, M42. sensor_format: the optical "
@@ -204,12 +205,12 @@ CAMERA = DeviceDefinition(
     normalize=normalize_camera,
     checks=CAMERA_CHECKS,
     units=CAMERA_UNITS,
-    search_term="machine vision camera",
+    search_term="camera",
     search_hint=(
-        "The buyer wants an industrial machine-vision camera (area-scan or line-scan; GigE Vision, USB3 Vision; "
-        "makers such as Basler, Hikrobot, Teledyne FLIR, Daheng, IDS). Always say 'machine vision' or "
-        "'industrial camera' in the query, or name a maker. Never write queries that would find CCTV, security, "
-        "IP, surveillance, dashcam, webcam or consumer cameras."
+        "The buyer is open to any camera: prioritize industrial machine-vision cameras (area-scan/line-scan, "
+        "Basler, Hikrobot, Teledyne FLIR, Daheng, IDS), but also search for ordinary digital/photo/video cameras, "
+        "webcams, action cameras, and CCTV/security cameras. Include several distinct camera categories across the "
+        "queries, with machine-vision queries first. Do not exclude a camera category."
     ),
     fields=[
         FieldDef(name="min_megapixels", label="Resolution", kind="number", unit="MP"),

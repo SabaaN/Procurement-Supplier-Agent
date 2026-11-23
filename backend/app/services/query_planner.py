@@ -46,7 +46,8 @@ def spec_items(device, criteria: dict) -> list[dict]:
             unit = f" {f.unit}" if f.unit else ""
             term = f"{vtxt}{unit}".replace(" / ", " ")
             if f.kind in ("select", "multiselect"):
-                term += f" {f.label.lower()}"
+                word = f.label.lower() if f.search_word is None else f.search_word
+                term = f"{term} {word}".strip()
         op = "at least " if f.name.startswith("min_") else "at most " if f.name.startswith("max_") else ""
         flexible = bool(req.get("flexible"))
         items.append(

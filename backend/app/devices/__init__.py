@@ -2,11 +2,12 @@
 from .base import DeviceDefinition
 from .camera import CAMERA
 from .encoder import ENCODER
+from .photoelectric import PHOTOELECTRIC
 
-DEVICES: dict[str, DeviceDefinition] = {CAMERA.key: CAMERA, ENCODER.key: ENCODER}
+DEVICES: dict[str, DeviceDefinition] = {d.key: d for d in (CAMERA, ENCODER, PHOTOELECTRIC)}
 
 # Shown in the dropdown but not selectable yet.
-COMING_SOON = {"sensor": "Sensor", "plc": "PLC"}
+COMING_SOON = {"plc": "PLC"}
 
 
 class UnsupportedDevice(ValueError):

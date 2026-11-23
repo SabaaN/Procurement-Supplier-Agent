@@ -7,6 +7,7 @@ from pydantic import BaseModel, PositiveFloat, PositiveInt
 
 from .base import SHARED_FIELDS, DeviceDefinition, FieldDef, ProductBase, Req, SharedCriteria
 from .compare import any_overlap, at_least, at_most, equals, same_number, within_range
+from .parse import ip_rating, number, pick, pick_all, voltage_range
 
 EncoderType = Literal["incremental", "absolute"]
 ShaftType = Literal["solid", "hollow", "blind hollow"]
@@ -139,55 +140,33 @@ _OUTPUT = [
 ]
 
 
-def _pick(value, rules):
-    """The first canonical value whose words appear in the text (rules are ordered), else None."""
-    s = (value or "").lower()
-    return next((canon for needles, canon in rules if any(n in s for n in needles)), None)
-
-
-def _number(value, low, high):
-    ok = isinstance(value, (int, float)) and not isinstance(value, bool) and low < value <= high
-    return value if ok else None
-
-
 def _outputs(items):
-    found = []
-    for item in items:
-        s = str(item).lower()
-        for pattern, canon in _OUTPUT:
-            if re.search(pattern, s) and canon not in found:
-                found.append(canon)
-    return found
-
-
-def _ip(value):
-    m = re.search(r"ip\s*-?\s*(\d)\s*(\d)", (value or "").lower())
-    return int(m.group(1) + m.group(2)) if m else None
+    return pick_all(items, _OUTPUT)
 
 
 def normalize_encoder(raw: dict) -> tuple[dict, list[str]]:
     """Loose extraction -> EncoderSpec fields, plus flags. Unknown values become None, never guessed."""
-    bits = _number(raw.get("resolution_bits"), 0, 40)
-    steps = _number(raw.get("singleturn_steps"), 1, 2**40)
+    bits = number(raw.get("resolution_bits"), 0, 40)
+    steps = number(raw.get("singleturn_steps"), 1, 2**40)
     if bits is None and steps and math.log2(steps).is_integer():
         bits = int(math.log2(steps))  # 8192 steps -> 13 bits: arithmetic in Python, not by the model
-    lo, hi = _number(raw.get("supply_min_v"), 0, 60), _number(raw.get("supply_max_v"), 0, 60)
+    lo, hi = number(raw.get("supply_min_v"), 0, 60), number(raw.get("supply_max_v"), 0, 60)
     if lo is not None and hi is not None and lo > hi:
         lo, hi = hi, lo
 
     out = {
-        "encoder_type": _pick(raw.get("encoder_type"), _TYPE),
-        "ppr": int(p) if (p := _number(raw.get("ppr"), 0, 10_000_000)) else None,
+        "encoder_type": pick(raw.get("encoder_type"), _TYPE),
+        "ppr": int(p) if (p := number(raw.get("ppr"), 0, 10_000_000)) else None,
         "resolution_bits": int(bits) if bits else None,
         "multiturn": raw.get("multiturn"),
         "output": _outputs(raw.get("output") or []),
-        "shaft_type": _pick(raw.get("shaft_type"), _SHAFT),
-        "shaft_diameter_mm": _number(raw.get("shaft_diameter_mm"), 0, 200),
-        "housing_diameter_mm": _number(raw.get("housing_diameter_mm"), 0, 500),
+        "shaft_type": pick(raw.get("shaft_type"), _SHAFT),
+        "shaft_diameter_mm": number(raw.get("shaft_diameter_mm"), 0, 200),
+        "housing_diameter_mm": number(raw.get("housing_diameter_mm"), 0, 500),
         "supply_min_v": lo,
         "supply_max_v": hi,
-        "max_rpm": int(r) if (r := _number(raw.get("max_rpm"), 0, 200_000)) else None,
-        "ip_rating": _ip(raw.get("ip_rating")),
+        "max_rpm": int(r) if (r := number(raw.get("max_rpm"), 0, 200_000)) else None,
+        "ip_rating": ip_rating(raw.get("ip_rating")),
     }
     # an encoder with a single-turn bit resolution is absolute, whatever the wording
     if out["encoder_type"] is None and out["resolution_bits"]:
@@ -241,14 +220,17 @@ ENCODER = DeviceDefinition(
         "would find video encoders, streaming encoders, hobby rotary knobs (KY-040, EC11) or linear encoders."
     ),
     fields=[
-        FieldDef(name="encoder_type", label="Encoder type", kind="select", options=list(get_args(EncoderType))),
+        FieldDef(name="encoder_type", label="Encoder type", kind="select", options=list(get_args(EncoderType)),
+                 search_word=""),
         FieldDef(name="min_ppr", label="Resolution", kind="number", unit="PPR",
                  help="Pulses per revolution (incremental encoders)"),
         FieldDef(name="min_resolution_bits", label="Single-turn resolution", kind="number", unit="bit",
                  help="Absolute encoders, e.g. 13 bit = 8192 positions"),
         FieldDef(name="multiturn", label="Multi-turn", kind="toggle", help="Absolute encoders that count turns"),
-        FieldDef(name="output", label="Output / interface", kind="multiselect", options=list(get_args(Output))),
-        FieldDef(name="shaft_type", label="Shaft type", kind="select", options=list(get_args(ShaftType))),
+        FieldDef(name="output", label="Output / interface", kind="multiselect", options=list(get_args(Output)),
+                 search_word="output"),
+        FieldDef(name="shaft_type", label="Shaft type", kind="select", options=list(get_args(ShaftType)),
+                 search_word="shaft"),
         FieldDef(name="shaft_diameter", label="Shaft / bore diameter", kind="number", unit="mm"),
         FieldDef(name="max_housing_diameter", label="Housing diameter", kind="number", unit="mm",
                  help="The most it can be, e.g. 58 for a 58 mm space"),

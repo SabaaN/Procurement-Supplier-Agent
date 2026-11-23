@@ -60,6 +60,12 @@ photo/video, webcam, action and CCTV/security cameras. Camera products from any 
 absolute, solid or hollow shaft). Video encoders, hobby rotary knobs (KY-040, EC11) and linear encoders are
 recognised on the page and skipped as "wrong kind of product".
 
+**Photoelectric sensor**: industrial photoelectric sensors (through-beam, retro-reflective, diffuse,
+background suppression, fiber optic). Proximity sensors, light curtains, PIR motion detectors and hobby IR
+modules are skipped as "wrong kind of product". Specs: sensing method, sensing distance (a minimum, in mm;
+"2 m" or "20 cm" on a page is converted), output, light-on / dark-on (sensors with a selector count for
+either), light source, housing, connection, your supply voltage, response time (a maximum, in ms) and IP rating.
+
 Encoder specs: encoder type, resolution (PPR for incremental, single-turn bits for absolute), multi-turn,
 output / interface, shaft type, shaft or bore diameter, housing diameter (a maximum: the space it must fit),
 your supply voltage (kept when it falls inside the encoder's range), max speed and IP rating.

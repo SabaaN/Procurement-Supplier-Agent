@@ -188,8 +188,9 @@ def test_fallback_queries_are_shop_style_without_flexible_numbers():
     crit = {"currency": "PKR", "min_megapixels": {"value": 5, "required": True},
             "min_fps": {"value": 30, "required": False, "flexible": True}}
     qs = query_planner.fallback_queries(get_device("camera"), items(crit), 1, crit)
-    assert qs[0] == "machine vision camera 5 MP price in Pakistan"
-    assert all("machine vision" in q and "30" not in q and "datasheet" not in q for q in qs)
+    assert qs[0] == "machine vision camera 5 MP price in Pakistan"  # machine vision first, local shops
+    assert any("digital camera" in q for q in qs)  # then other kinds of camera too
+    assert all("30" not in q and "datasheet" not in q for q in qs)
 
 
 def test_prompt_steers_away_from_cctv_and_keeps_flexible_out():
@@ -202,7 +203,8 @@ def test_prompt_steers_away_from_cctv_and_keeps_flexible_out():
 def test_planner_falls_back_when_groq_is_unavailable(monkeypatch):
     monkeypatch.setattr(query_planner.settings.__class__, "groq_api_key", property(lambda s: ""))
     queries, source = real_plan("camera", {"currency": "USD"}, 1)
-    assert source.startswith("fallback") and queries == ["machine vision camera price", "machine vision camera buy online"]
+    assert source.startswith("fallback") and queries[0] == "machine vision camera price"
+    assert "industrial camera price" in queries
 
 
 def test_budget_order_error_names_a_field_the_form_can_highlight():

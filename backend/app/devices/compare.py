@@ -42,3 +42,9 @@ def within_range(wanted, actual):
         return None
     low, high = actual
     return low <= wanted <= high
+
+
+def contains(wanted, actual):
+    """actual is a list of what the product supports (e.g. light-on and dark-on, selectable):
+    the single wanted value must be in it."""
+    return None if not actual else wanted in actual

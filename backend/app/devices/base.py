@@ -92,6 +92,9 @@ class FieldDef(BaseModel):
     options: list[str] = []
     help: str | None = None
     has_required_toggle: bool = True  # shows the Required / Preferred switch
+    # Word put after a chosen option in template search queries ("global" + "shutter"). None: the
+    # label; "": nothing, for options that read on their own ("through-beam", "M18").
+    search_word: str | None = None
 
 
 SHARED_FIELDS = [

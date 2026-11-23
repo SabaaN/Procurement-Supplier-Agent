@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 
 
 # Bump when the extraction prompt or schema changes, so pages read with the old one are read again.
-EXTRACTION_VERSION = 2
+EXTRACTION_VERSION = 3  # 3: prices from the page's price boxes and product data
 
 
 def cache_key(device_key: str) -> str:
@@ -38,7 +38,9 @@ SYSTEM = (
     "Set is_listing_page to true for a shop's category, search-results or catalogue page that shows several "
     "products for sale. Set is_right_device_type as the device notes describe. "
     "For price give ONE unit as a plain number (no symbols or thousands separators) and the ISO currency code "
-    "only if the page shows it clearly; otherwise null."
+    "only if the page shows it clearly; otherwise null. The 'Prices shown on the page' section at the end is "
+    "part of the page. When prices depend on quantity (e.g. 1-99 pieces and 100+ pieces), give the price for "
+    "the smallest quantity, and put that minimum quantity in moq."
 )
 
 
@@ -77,7 +79,10 @@ def _invoke(device, url: str, title: str, text: str):
 
 
 _NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
-_CURRENCY_NAMES = {"rs": "PKR", "rs.": "PKR", "\u20a8": "PKR", "\u20ac": "EUR", "\u00a3": "GBP"}
+_CURRENCY_NAMES = {
+    "rs": "PKR", "rs.": "PKR", "\u20a8": "PKR", "\u20ac": "EUR", "\u00a3": "GBP", "\u20b9": "INR",
+    "us$": "USD", "usd$": "USD", "c$": "CAD", "a$": "AUD", "s$": "SGD", "hk$": "HKD",
+}
 
 
 def _price_on_page(price: float, text: str) -> bool:

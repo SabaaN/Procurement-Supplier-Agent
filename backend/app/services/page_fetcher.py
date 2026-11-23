@@ -14,7 +14,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from ..config import settings
-from . import contacts
+from . import contacts, prices
 
 log = logging.getLogger(__name__)
 
@@ -155,6 +155,7 @@ def fetch_page(url: str, client: httpx.Client | None = None) -> FetchResult:
             return FetchResult(url, False, error="too little text (page may need JavaScript)")
         try:
             links = contacts.page_links(html, str(resp.url))  # after redirects, so relative links resolve
+            links["prices"] = prices.page_prices(html)  # price boxes the cleaner drops, and embedded offers
         except Exception as e:  # contact details are a bonus: never lose the page over them
             log.warning("Could not read links on %s: %s", url, e)
             links = {}

@@ -14,7 +14,9 @@ from ..services import query_planner, web_search
 from .checks import check_product
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from ..config import settings
-from ..services import cache, contacts, explainer, extractor, fx, llm, page_fetcher, query_planner, web_search
+from ..services import (
+    cache, contacts, explainer, extractor, fx, llm, page_fetcher, prices, query_planner, web_search,
+)
 from . import scoring
 
 MIN_RESULTS = 5  # fewer survivors than this -> plan broader queries
@@ -159,7 +161,8 @@ def _extract_pages(device_key: str, pages: list[dict], label: str = "page") -> t
             continue
         else:
             try:
-                kind, product = extractor.extract_page(device_key, page["url"], page.get("title", ""), page["text"])
+                text = page["text"] + prices.price_block((page.get("links") or {}).get("prices"))
+                kind, product = extractor.extract_page(device_key, page["url"], page.get("title", ""), text)
             except llm.DailyLimitReached as e:
                 limited = str(e)
                 counts["not_read"] += 1

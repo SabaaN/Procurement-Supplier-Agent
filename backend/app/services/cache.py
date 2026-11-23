@@ -87,7 +87,10 @@ def get_page(url: str, max_age_hours: float | None = None) -> dict | None:
     if row is None or not _fresh(row[3], max_age_hours):
         return None
     ok, text, error, _, links = row
-    return {"url": url, "ok": bool(ok), "text": text or "", "error": error, "links": json.loads(links) if links else {}}
+    links = json.loads(links) if links else {}
+    if ok and links and "prices" not in links:
+        return None  # read before prices were collected from the HTML: fetch it again, once
+    return {"url": url, "ok": bool(ok), "text": text or "", "error": error, "links": links}
 
 
 def put_page(url: str, ok: bool, text: str, error: str | None, links: dict | None = None) -> None:

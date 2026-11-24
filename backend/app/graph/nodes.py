@@ -15,7 +15,7 @@ from .checks import check_product
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from ..config import settings
 from ..services import (
-    cache, contacts, explainer, extractor, fx, llm, page_fetcher, prices, query_planner, web_search,
+    cache, contacts, extractor, fx, llm, page_fetcher, prices, query_planner, web_search,
 )
 from . import scoring
 
@@ -48,7 +48,7 @@ def route_device(state: SearchState) -> str:
 
 
 def finalize(state: SearchState) -> dict:
-    """Sort by score (cheaper first on ties) and attach a plain-language explanation to each product."""
+    """Sort by score (cheaper first on ties). No model call: ranking is plain Python."""
     emit("rank", "running", "Ranking results")
 
     def sort_key(p):
@@ -59,10 +59,7 @@ def finalize(state: SearchState) -> dict:
                 -(p.get("match_score") or 0), cost if cost is not None else float("inf"))
 
     ranked = sorted(state.get("candidates", []), key=sort_key)
-    texts, source = explainer.explain(state.get("device_type"), state.get("criteria", {}), ranked)
-    ranked = [{**p, "explanation": text} for p, text in zip(ranked, texts)]
-    note = "" if source == "llm" else f" ({source})"
-    emit("rank", "done", f"{len(ranked)} products ranked{note}", done=len(ranked), total=len(ranked))
+    emit("rank", "done", f"{len(ranked)} products ranked", done=len(ranked), total=len(ranked))
     return {"ranked": ranked}
 
 

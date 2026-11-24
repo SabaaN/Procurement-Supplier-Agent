@@ -127,7 +127,6 @@ export default function ResultsTable({ search, results, onToggleShortlist }) {
                   <th>Product link</th>
                   <th>Datasheet</th>
                   <th>Key specs</th>
-                  <th aria-label="Details" />
                 </tr>
               </thead>
               <tbody>

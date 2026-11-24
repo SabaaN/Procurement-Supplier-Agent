@@ -17,8 +17,6 @@ class Settings:
     groq_model_small: str = os.getenv("GROQ_MODEL_SMALL", "openai/gpt-oss-20b")
     max_queries: int = 4  # per attempt; keeps Tavily credits and Groq tokens low
     results_per_query: int = 5
-    groq_model_large: str = os.getenv("GROQ_MODEL_LARGE", "openai/gpt-oss-120b")
-    explain_top_n: int = 10  # only the top N products are sent to the model for explanations
 
     # page fetching
     # new pages fetched per search attempt. Each one costs a Groq extraction call: lower this

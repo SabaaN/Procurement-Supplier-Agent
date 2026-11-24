@@ -236,69 +236,6 @@ a.product__title:hover {
   color: var(--brass);
 }
 
-.why > td {
-  padding: 0 var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--border);
-}
-
-.why__body {
-  display: grid;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-}
-
-.why__text,
-.why__meta {
-  margin: 0;
-}
-
-.why__meta {
-  font-size: var(--text-sm);
-}
-
-.badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.badge {
-  padding: 2px var(--space-3);
-  border-radius: 999px;
-  font-size: var(--text-sm);
-}
-
-.badge--met {
-  background: var(--ok-soft);
-  color: var(--ok);
-}
-
-.badge--missed {
-  background: var(--danger-soft);
-  color: var(--danger);
-}
-
-.flags {
-  margin: 0;
-  padding-left: var(--space-5);
-  font-size: var(--text-sm);
-  color: var(--warn);
-}
-
-.breakdown {
-  display: grid;
-  gap: var(--space-3) var(--space-5);
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-}
-
-.breakdown__item {
-  display: grid;
-  gap: var(--space-1);
-  font-size: var(--text-sm);
-}
-
 .results__empty,
 .results__credit {
   margin: 0;
@@ -386,7 +323,6 @@ a.product__title:hover {
 
   .cell--product,
   .cell--specs,
-  .cell--toggle,
   .cell--link,
   .cell--datasheet {
     grid-column: 1 / -1;
@@ -407,15 +343,6 @@ a.product__title:hover {
     color: var(--muted);
   }
 
-  .why > td {
-    padding: var(--space-2) 0 0;
-    border: 0;
-  }
-
-  .why {
-    margin-bottom: var(--space-3);
-  }
-
   .row {
     margin-bottom: var(--space-3);
   }
@@ -432,10 +359,6 @@ a.product__title:hover {
 
 .closenote {
   color: var(--muted);
-}
-
-.badge--close {
-  border-style: dashed;
 }
 
 .banner--warn {

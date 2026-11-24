@@ -173,7 +173,7 @@ CORE_COLUMNS = [
     ("requirements_met", "requirements_met"), ("requirements_close", "requirements_close"),
     ("close_notes", "close_notes"), ("requirements_missed", "requirements_missed"),
     ("misses", "Not an exact match because"),
-    ("flags", "flags"), ("explanation", "explanation"), ("fetched_at", "fetched_at"),
+    ("flags", "flags"), ("fetched_at", "fetched_at"),
 ]
 
 

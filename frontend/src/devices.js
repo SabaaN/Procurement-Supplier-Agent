@@ -14,6 +14,14 @@ export const KEY_SPECS = {
     { key: 'shaft_diameter_mm', format: (v) => `Ø${v} mm` },
     { key: 'output', format: (v) => v.join(' / ') },
   ],
+  photoelectric: [
+    { key: 'sensing_method', format: (v) => v },
+    { key: 'sensing_range_mm', format: (v) => (v >= 1000 ? `${v / 1000} m` : `${v} mm`) },
+    { key: 'output', format: (v) => v.join(' / ') },
+    { key: 'switching_mode', format: (v) => v.join(' / ') },
+    { key: 'housing', format: (v) => v },
+    { key: 'response_time_ms', format: (v) => `${v} ms` },
+  ],
 }
 
 /** The spec texts to show for one product, skipping anything the page didn't state. */

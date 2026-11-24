@@ -33,7 +33,7 @@ def test_search_runs_in_the_background_and_results_are_saved():
     assert client.get(f"/api/searches/{sid}").json()["status"] == "done"
     data = client.get(f"/api/searches/{sid}/results").json()
     assert len(data["products"]) >= 5
-    assert data["products"][0]["rank"] == 1 and data["products"][0]["explanation"]
+    assert data["products"][0]["rank"] == 1 and "explanation" not in data["products"][0]
     assert data["search"]["product_count"] == len(data["products"])
 
 
@@ -124,3 +124,20 @@ def test_csv_cells_cannot_run_as_formulas():
     assert _cell("=HYPERLINK(\"http://x\")") == "'=HYPERLINK(\"http://x\")"
     assert _cell("@SUM(A1)") == "'@SUM(A1)"
     assert _cell(["a", "b"]) == "a; b" and _cell(-5) == -5 and _cell(None) is None
+
+def test_ranking_makes_no_model_call(monkeypatch):
+    """The explanation step is gone: ranking is plain Python and never calls the model."""
+    import importlib.util
+
+    from app.graph import nodes
+    from app.services import llm
+
+    def forbidden(*a, **k):
+        raise AssertionError("ranking must not call the model")
+
+    monkeypatch.setattr(llm, "call", forbidden)
+    monkeypatch.setattr(llm, "chat", forbidden)
+    ranked = nodes.finalize({"criteria": {}, "candidates": [
+        {"title": "b", "match_score": 50}, {"title": "a", "match_score": 90}]})["ranked"]
+    assert [p["title"] for p in ranked] == ["a", "b"] and "explanation" not in ranked[0]
+    assert importlib.util.find_spec("app.services.explainer") is None

@@ -3,6 +3,9 @@ import pytest
 from app.devices import get_device
 from app.services import cache, extractor, fx, llm, page_fetcher, query_planner, web_search
 
+# What a fake product page says: a device name and a price, so the pre-model page check reads it.
+PRODUCT_TEXT = "Stub product page for a camera / encoder / photoelectric sensor. Price Rs 9,000. " * 5
+
 @pytest.fixture(autouse=True)
 def fake_services(monkeypatch, tmp_path):
     llm.reset_limits()  # no model starts a test marked as out for the day
@@ -19,7 +22,7 @@ def fake_services(monkeypatch, tmp_path):
         ]
 
     def fake_fetch(url, client=None):
-        return page_fetcher.FetchResult(url, True, text="stub page text " * 20)
+        return page_fetcher.FetchResult(url, True, text=PRODUCT_TEXT)
 
     ids = {}  # each new URL gets the next stub product (price 8000, 11000, 14000, ...)
 

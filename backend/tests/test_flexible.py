@@ -11,6 +11,7 @@ from app.main import app
 from app.services import cache, extractor, page_fetcher, query_planner
 
 from .test_extraction import FakeLLM
+from .conftest import PRODUCT_TEXT
 
 real_extract_page = extractor.extract_page  # before the autouse fixture swaps in a fake
 real_plan = query_planner.plan
@@ -146,7 +147,7 @@ def test_listing_pages_are_followed_one_level(monkeypatch):
     links = {"products": [f"https://shop.test/product/cam-{i}/" for i in range(10)]}
 
     def fetch(url, client=None):
-        return page_fetcher.FetchResult(url, True, text="page text " * 30, links=links if url == listing else {})
+        return page_fetcher.FetchResult(url, True, text=PRODUCT_TEXT, links=links if url == listing else {})
 
     def page(device_key, url, title, text):
         if url == listing:

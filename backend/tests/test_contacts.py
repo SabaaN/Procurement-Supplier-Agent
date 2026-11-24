@@ -10,6 +10,7 @@ from app.main import app
 from app.services import contacts, datasheets, page_fetcher, store
 from app.services.contacts import enrich, page_links
 from app.services.datasheets import DatasheetError, download, filename_for
+from .conftest import PRODUCT_TEXT
 
 real_fetch_page = page_fetcher.fetch_page  # before the autouse fixture swaps in a fake
 
@@ -84,7 +85,7 @@ LINKS = {
 @pytest.fixture
 def api(monkeypatch):
     def fake_fetch(url, client=None):
-        return page_fetcher.FetchResult(url, True, text="stub page text " * 20, links=LINKS)
+        return page_fetcher.FetchResult(url, True, text=PRODUCT_TEXT, links=LINKS)
 
     monkeypatch.setattr(page_fetcher, "fetch_page", fake_fetch)
     monkeypatch.setattr(datasheets, "_resolve", lambda host: ["93.184.216.34"])  # a public address

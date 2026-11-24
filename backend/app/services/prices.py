@@ -50,6 +50,32 @@ def _offers(node, out: list[str]):
             _offers(value, out)
 
 
+def _count_products(node) -> int:
+    """How many schema.org Products a JSON-LD structure describes (an ItemList counts its items)."""
+    if isinstance(node, list):
+        return sum(_count_products(item) for item in node)
+    if not isinstance(node, dict):
+        return 0
+    kinds = node.get("@type")
+    kinds = kinds if isinstance(kinds, list) else [kinds]
+    if "ItemList" in kinds and isinstance(node.get("itemListElement"), list):
+        return len(node["itemListElement"])
+    own = 1 if "Product" in kinds else 0
+    return own + sum(_count_products(v) for k, v in node.items() if k != "offers" and isinstance(v, (dict, list)))
+
+
+def products_in_data(soup) -> int:
+    """Products described in the page's embedded data: 1 on a product page, many on a listing, 0 if none."""
+    total = 0
+    for tag in soup.find_all("script", type=re.compile("ld\\+json", re.I)):
+        try:
+            total += _count_products(json.loads(tag.string or tag.get_text() or ""))
+        except (ValueError, TypeError):
+            continue
+    total += len(soup.find_all(attrs={"itemtype": re.compile(r"schema\.org/Product$", re.I)}))
+    return total
+
+
 def _structured(soup) -> list[str]:
     out: list[str] = []
     for tag in soup.find_all("script", type=re.compile("ld\\+json", re.I)):
@@ -81,18 +107,21 @@ def _visible(soup) -> list[str]:
             candidates.append(text)
     candidates = list(dict.fromkeys(candidates))
     # a price box and the spans inside it both match: keep the box, which has the tiers together
-    kept = [c for c in candidates if not any(c != other and c in other for other in candidates)]
-    return kept[:MAX_SHOWN]
+    return [c for c in candidates if not any(c != other and c in other for other in candidates)]
 
 
 def page_prices(html: str) -> dict:
-    """{'shown': [...visible price texts], 'data': [...embedded offers]} from raw HTML."""
+    """From raw HTML: {'shown': visible price texts, 'data': embedded offers,
+    'count': how many separate prices are shown, 'products': products in the embedded data}.
+    count and products help tell a shop listing from a single product page without the model."""
     soup = BeautifulSoup(html, "html.parser")
     data = _structured(soup)  # before scripts are removed: JSON-LD lives in <script>
+    products = products_in_data(soup)
     # crossed-out pre-sale prices (<del>Rs 9,000</del> <ins>Rs 7,500</ins>) are not the price
     for tag in soup(["script", "style", "noscript", "svg", "template", "del", "s", "strike"]):
         tag.decompose()
-    return {"shown": _visible(soup), "data": data}
+    shown = _visible(soup)
+    return {"shown": shown[:MAX_SHOWN], "data": data, "count": len(shown), "products": products}
 
 
 def price_block(prices: dict | None) -> str:

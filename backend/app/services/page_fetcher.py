@@ -103,12 +103,24 @@ def clean_html(html: str) -> str:
 
     # Add back table rows and definition lists that trafilatura left out.
     missing = [" | ".join(cells) for cells in _spec_rows(html) if not all(c in text for c in cells)]
-    tables = "\n".join(missing)[: int(limit * 0.4)]
-    if not tables:
+    tables = "\n".join(missing)
+    return trim_text(text + TABLES_HEADER + tables if tables else text, limit)
+
+
+TABLES_HEADER = "\n\nSpecification tables:\n"
+
+
+def trim_text(text: str, limit: int) -> str:
+    """Cut page text to `limit` characters without losing the spec tables: they get at least 40% of
+    the room, and all of it the description doesn't need. Also used on pages cached at a larger size."""
+    if len(text) <= limit:
+        return text
+    if TABLES_HEADER not in text:
         return text[:limit]
-    header = "\n\nSpecification tables:\n"
-    room = max(limit - len(tables) - len(header), 0)
-    return (text[:room] + header + tables)[:limit]
+    main, tables = text.split(TABLES_HEADER, 1)
+    table_room = max(int(limit * 0.4), limit - len(TABLES_HEADER) - len(main))
+    tables = tables[:table_room]
+    return main[: max(limit - len(TABLES_HEADER) - len(tables), 0)] + TABLES_HEADER + tables
 
 
 def _robots_allowed(url: str, client: httpx.Client) -> bool:

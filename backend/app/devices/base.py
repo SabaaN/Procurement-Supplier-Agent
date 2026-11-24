@@ -118,6 +118,9 @@ class DeviceDefinition:
     # What to search for, and what the searches must avoid (e.g. CCTV when the buyer wants machine vision).
     search_term: str = ""
     search_hint: str = ""
+    # Words that show a page is about this device. A page with none of them and no price is skipped
+    # without a model call (see services/triage.py). Lower case; leave empty to never skip this way.
+    page_words: tuple[str, ...] = ()
     normalize: Callable[[dict], tuple[dict, list[str]]] | None = None
     # Requirement checks: criteria field -> (spec field or tuple of fields, comparison, label), see compare.py.
     checks: dict = field(default_factory=dict)

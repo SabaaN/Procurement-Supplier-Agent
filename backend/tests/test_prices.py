@@ -96,7 +96,7 @@ def test_bold_or_unrelated_classes_are_not_mistaken():
 
 
 def test_pages_without_prices_add_nothing():
-    assert page_prices("<p>Contact us for a quote</p>") == {"shown": [], "data": []}
+    assert page_prices("<p>Contact us for a quote</p>") == {"shown": [], "data": [], "count": 0, "products": 0}
     assert price_block({"shown": [], "data": []}) == "" and price_block(None) == ""
 
 

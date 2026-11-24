@@ -213,6 +213,7 @@ ENCODER = DeviceDefinition(
     checks=ENCODER_CHECKS,
     units=ENCODER_UNITS,
     search_term="industrial rotary encoder",
+    page_words=("encoder", "ppr", "pulses per", "p/r", "incremental", "absolute", "rotary"),
     search_hint=(
         "The buyer wants an industrial rotary encoder (incremental or absolute; solid or hollow shaft; makers "
         "such as Kubler, SICK, Omron, Autonics, Baumer, Heidenhain, Pepperl+Fuchs). Always say 'rotary encoder', "

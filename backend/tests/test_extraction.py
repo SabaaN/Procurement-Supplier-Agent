@@ -92,7 +92,7 @@ def test_bare_dollar_sign_leaves_currency_unknown(monkeypatch):
 
 def test_non_product_page_returns_none(monkeypatch):
     monkeypatch.setattr(extractor, "_invoke", lambda *a: good_extraction(is_product_page=False))
-    assert real_extract_product("camera", "https://a.test/blog", "", TEXT) is None
+    assert real_extract_product("camera", "https://a.test/info", "", TEXT) is None
 
 
 def test_llm_failure_is_retried_once(monkeypatch):
@@ -117,17 +117,17 @@ def test_llm_failing_twice_raises_extraction_error(monkeypatch):
 def test_extraction_cache_roundtrip_including_not_a_product():
     assert cache.get_extraction("https://a.test", "camera") is None
     cache.put_extraction("https://a.test", "camera", {"title": "X"})
-    cache.put_extraction("https://a.test/blog", "camera", None)
+    cache.put_extraction("https://a.test/info", "camera", None)
     assert cache.get_extraction("https://a.test", "camera") == {"product": {"title": "X"}, "kind": "product"}
-    assert cache.get_extraction("https://a.test/blog", "camera") == {"product": None, "kind": "other"}
+    assert cache.get_extraction("https://a.test/info", "camera") == {"product": None, "kind": "other"}
     assert cache.get_extraction("https://a.test", "camera", max_age_hours=-1) is None  # expired
 
 
 # ---- the extract node ----
 
 PAGES = [
-    {"url": "https://a.test/p", "ok": True, "text": "t", "title": ""},
-    {"url": "https://a.test/blog", "ok": True, "text": "t", "title": ""},
+    {"url": "https://a.test/p", "ok": True, "text": "Camera, 5 MP. Price Rs 9,000.", "title": ""},
+    {"url": "https://a.test/info", "ok": True, "text": "All about choosing a camera.", "title": ""},
 ]
 
 
@@ -136,14 +136,14 @@ def test_extract_node_skips_non_product_pages_and_uses_cache(monkeypatch):
 
     def fake(device_key, url, title, text):
         calls.append(url)
-        return None if "blog" in url else {"title": url, "source_url": url, "price": 1.0}
+        return None if "info" in url else {"title": url, "source_url": url, "price": 1.0}
 
     monkeypatch.setattr(extractor, "extract_product", fake)
     state = {"device_type": "camera", "pages": PAGES}
     out = nodes.extract(state)
     assert [p["source_url"] for p in out["products"]] == ["https://a.test/p"]
     nodes.extract(state)
-    assert calls == ["https://a.test/p", "https://a.test/blog"]  # second run: all from the cache
+    assert calls == ["https://a.test/p", "https://a.test/info"]  # second run: all from the cache
 
 
 def test_extract_node_errors_when_every_page_fails(monkeypatch):

@@ -52,13 +52,14 @@ def main():
     for reason, n in Counter(err for ok, err in pages if not ok).most_common(8):
         print(f"    {n} x {reason}")
 
+    reading_cutoff = (datetime.now(timezone.utc) - timedelta(hours=settings.extraction_cache_hours)).isoformat()
     rows = db.execute(
         "SELECT url, product, kind FROM extraction_cache WHERE device_type = ? AND fetched_at >= ?",
-        (extractor.cache_key(device), cutoff),
+        (extractor.cache_key(device), reading_cutoff),
     ).fetchall()
     products = [json.loads(p) for _, p, _ in rows if p]
     kinds = Counter(kind or "other" for _, _, kind in rows)
-    print(f"\n== Pages the model read in the last 24 hours: {len(rows)}")
+    print(f"\n== Pages the model read in the last {settings.extraction_cache_hours / 24:g} days: {len(rows)}")
     for kind, label in [("product", "product pages"), ("listing", "listing pages (product links followed)"),
                         ("wrong_type", "wrong kind of product (e.g. CCTV)"), ("other", "not product pages")]:
         print(f"  {kinds[kind]} {label}")

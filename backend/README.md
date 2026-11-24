@@ -28,6 +28,8 @@ tests/
 
 | Variable | Default | What it does |
 |---|---|---|
+| `MAX_PAGE_CHARS` | `6000` | Characters of page text sent to the model per page (about 1 token per 4 characters). Spec tables and the price box are kept first. |
+| `EXTRACTION_CACHE_DAYS` | `7` | How long what the model read off a page is reused before reading it again. Prices in results can be up to this old; lower it if prices move fast. Downloads still refresh daily (no model call). |
 | `GROQ_REASONING_EFFORT` | `low` | For gpt-oss models: how much hidden reasoning before each answer. Those tokens count towards Groq's daily limit, and reading specs off a page needs little. `medium`/`high` for more care, empty for Groq's default. |
 | `GROQ_FALLBACK_MODEL` | `openai/gpt-oss-120b` | When a model hits Groq's daily token limit, calls move to this one (it has its own allowance). When every model is out, the search stops reading pages, keeps what it has, and says when to try again. Empty turns the backup off. |
 | `MAX_PAGES_PER_ATTEMPT` | `12` | Pages read per search attempt (up to 3 attempts). More pages = more results, but each page is one Groq call; lower it if the progress panel shows many "failed" extractions. |
@@ -74,3 +76,10 @@ To add another device, write a module like `app/devices/encoder.py` (criteria, s
 normalisation, checks, form fields) and register it in `app/devices/__init__.py`. Its checks use the
 comparisons in `app/devices/compare.py`; the search, filter, ranking, form and CSV pick it up automatically.
 Add its key specs to `frontend/src/devices.js` for the results table.
+
+### Saving model calls
+
+Before a page goes to the model, `app/services/triage.py` skips the obvious ones in plain Python:
+blog, news, guide, company and policy pages (by their address), pages that never mention the device
+and show no price, and shop listings (many product links and prices), whose product links are followed
+directly. The progress panel counts them as "skipped without a model call". When unsure, the page is read.

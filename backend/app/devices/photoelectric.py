@@ -216,6 +216,9 @@ PHOTOELECTRIC = DeviceDefinition(
     checks=PHOTOELECTRIC_CHECKS,
     units=PHOTOELECTRIC_UNITS,
     search_term="photoelectric sensor",
+    page_words=("photoelectric", "photo-electric", "photo electric", "photo sensor", "photosensor",
+                "through-beam", "through beam", "retro-reflective", "retroreflective", "diffuse",
+                "background suppression", "sensing distance", "sensing range", "light-on", "dark-on", "reflector"),
     search_hint=(
         "The buyer wants an industrial photoelectric sensor (through-beam, retro-reflective, diffuse or background "
         "suppression; makers such as Omron, SICK, Keyence, Autonics, Banner, Pepperl+Fuchs). Always say "

@@ -25,7 +25,9 @@ class Settings:
     fetch_workers: int = 5  # parallel downloads
     fetch_timeout: float = 15.0  # seconds
     max_page_bytes: int = 2_000_000  # stop downloading a page after this
-    max_page_chars: int = 12_000  # cleaned text kept per page (keeps LLM tokens down)
+    # cleaned text sent to the model per page: about 1 token per 4 characters. Spec tables and the price
+    # box are kept first, so most product pages need far less than this.
+    max_page_chars: int = int(os.getenv("MAX_PAGE_CHARS", "6000"))
     min_page_chars: int = 200  # less than this = probably a JavaScript-only page
     respect_robots: bool = True
     user_agent: str = "ProcurementAgent/0.1 (product research)"
@@ -56,7 +58,10 @@ class Settings:
     max_followed_per_attempt: int = int(os.getenv("MAX_FOLLOWED_PER_ATTEMPT", "12"))
 
     # cache
-    cache_ttl_hours: float = 24
+    cache_ttl_hours: float = 24  # downloaded pages: fetched again after a day (no model call)
+    # what the model read off a page: specs rarely change, so readings are reused for days. Prices in
+    # them can be up to this old; lower it if prices move fast.
+    extraction_cache_hours: float = float(os.getenv("EXTRACTION_CACHE_DAYS", "7")) * 24
     # Reasoning models (gpt-oss) think before answering, and those hidden tokens count towards the
     # daily limit. "low" is plenty for reading specs off a page; "" sends nothing (Groq's default).
     groq_reasoning_effort: str = os.getenv("GROQ_REASONING_EFFORT", "low")

@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from app.graph import nodes
 from app.services import cache, extractor, llm, page_fetcher
 from app.services.llm import DailyLimitReached
+from .conftest import PRODUCT_TEXT
 
 # Groq's own wording, from a real run
 TPD = ("Error code: 429 - {'error': {'message': 'Rate limit reached for model `openai/gpt-oss-20b` in organization "
@@ -126,7 +127,7 @@ def test_pipeline_stops_reading_and_keeps_what_it_has(monkeypatch):
         return "product", {"title": url, "source_url": url}
 
     monkeypatch.setattr(page_fetcher, "fetch_page",
-                        lambda url, client=None: page_fetcher.FetchResult(url, True, text="page text " * 30))
+                        lambda url, client=None: page_fetcher.FetchResult(url, True, text=PRODUCT_TEXT))
     monkeypatch.setattr(extractor, "extract_page", page)
     state = {"device_type": "camera", "urls": urls, "hits": []}
     state.update(nodes.fetch_clean(state))
@@ -144,5 +145,5 @@ def test_pipeline_reports_the_limit_when_nothing_could_be_read(monkeypatch):
 
     monkeypatch.setattr(extractor, "extract_page", page)
     out = nodes.extract({"device_type": "camera", "pages": [
-        {"url": "https://s.test/a", "ok": True, "text": "x"}], "urls": []})
+        {"url": "https://s.test/a", "ok": True, "text": PRODUCT_TEXT}], "urls": []})
     assert out["products"] == [] and out["error"] == "Groq daily token limit reached; try again in about 30 minutes"

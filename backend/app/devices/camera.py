@@ -206,6 +206,8 @@ CAMERA = DeviceDefinition(
     checks=CAMERA_CHECKS,
     units=CAMERA_UNITS,
     search_term="camera",
+    page_words=("camera", "megapixel", "fps", "frame rate", "image sensor", "cmos", "ccd", "lens", "gige",
+                "usb3", "webcam", "camcorder"),
     search_hint=(
         "The buyer is open to any camera: prioritize industrial machine-vision cameras (area-scan/line-scan, "
         "Basler, Hikrobot, Teledyne FLIR, Daheng, IDS), but also search for ordinary digital/photo/video cameras, "

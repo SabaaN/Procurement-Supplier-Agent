@@ -15,7 +15,7 @@ from .checks import check_product
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from ..config import settings
 from ..services import (
-    cache, contacts, extractor, fx, llm, page_fetcher, prices, query_planner, web_search,
+    cache, contacts, extractor, fx, llm, page_fetcher, prices, query_planner, triage, web_search,
 )
 from . import scoring
 
@@ -145,20 +145,29 @@ def fetch_clean(state: SearchState) -> dict:
 def _extract_pages(device_key: str, pages: list[dict], label: str = "page") -> tuple[list, Counter, str, str | None]:
     """Run (or reuse cached) extraction on each page.
     Returns ([(page, kind, product)], kind counts, last error, daily-limit message or None).
+    Obvious non-product pages and shop listings are recognised in Python first, without a model call.
     Once Groq's daily limit is reached, the remaining pages are read from the cache only."""
     key = extractor.cache_key(device_key)
+    device = get_device(device_key)
     out, counts, last_error, limited = [], Counter(), "", None
     for i, page in enumerate(pages, 1):
         emit("extract", "running", f"Extracting specs from {label} {i} of {len(pages)}", done=i, total=len(pages))
-        cached = cache.get_extraction(page["url"], key)
+        cached = cache.get_extraction(page["url"], key, settings.extraction_cache_hours)
+        obvious = None if cached is not None else triage.triage(device, page)
         if cached is not None:
             kind, product = cached["kind"], cached["product"]
+        elif obvious == "not_product":
+            counts["skipped"] += 1
+            continue
+        elif obvious == "listing":
+            kind, product = "listing", None  # its product links are followed without reading it
         elif limited:
             counts["not_read"] += 1
             continue
         else:
             try:
-                text = page["text"] + prices.price_block((page.get("links") or {}).get("prices"))
+                text = page_fetcher.trim_text(page["text"], settings.max_page_chars)
+                text += prices.price_block((page.get("links") or {}).get("prices"))
                 kind, product = extractor.extract_page(device_key, page["url"], page.get("title", ""), text)
             except llm.DailyLimitReached as e:
                 limited = str(e)
@@ -191,7 +200,8 @@ def _listing_links(results: list, known: set[str]) -> list[str]:
 
 def _kind_summary(counts: Counter) -> str:
     names = [("listing", "listing pages"), ("wrong_type", "wrong kind of product"),
-             ("other", "not product pages"), ("failed", "failed"), ("not_read", "not read: daily limit")]
+             ("other", "not product pages"), ("skipped", "skipped without a model call"), ("failed", "failed"),
+             ("not_read", "not read: daily limit")]
     return ", ".join(f"{counts[k]} {name}" for k, name in names if counts[k]) or "nothing else"
 
 

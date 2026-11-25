@@ -48,3 +48,8 @@ def contains(wanted, actual):
     """actual is a list of what the product supports (e.g. light-on and dark-on, selectable):
     the single wanted value must be in it."""
     return None if not actual else wanted in actual
+
+
+def all_of(wanted, actual):
+    """Both are lists (e.g. communication ports): the product must have every wanted value."""
+    return None if not actual else set(wanted) <= set(actual)

@@ -68,6 +68,12 @@ modules are skipped as "wrong kind of product". Specs: sensing method, sensing d
 "2 m" or "20 cm" on a page is converted), output, light-on / dark-on (sensors with a selector count for
 either), light source, housing, connection, your supply voltage, response time (a maximum, in ms) and IP rating.
 
+**PLC**: PLC CPUs (compact, modular, micro). I/O or expansion modules on their own, HMI panels,
+programming cables, VFDs and hobby boards are skipped as "wrong kind of product". Specs: PLC type, digital and analog inputs and outputs built into the CPU (minimums), output type (relay,
+transistor sink / NPN, transistor source / PNP; "transistor" without sink or source is flagged, not
+guessed), power supply, communication (all of the ports ticked), high-speed counter (kHz), pulse outputs
+(axes) and expandable. The brand and series (e.g. Siemens, S7-1200) are read and shown in results but are not search requirements.
+
 Encoder specs: encoder type, resolution (PPR for incremental, single-turn bits for absolute), multi-turn,
 output / interface, shaft type, shaft or bore diameter, housing diameter (a maximum: the space it must fit),
 your supply voltage (kept when it falls inside the encoder's range), max speed and IP rating.

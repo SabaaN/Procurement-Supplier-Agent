@@ -18,10 +18,10 @@ def new_search(criteria=CRIT, device="camera"):
 
 def test_devices_endpoints():
     devices = {d["key"]: d["enabled"] for d in client.get("/api/devices").json()}
-    assert devices == {"camera": True, "encoder": True, "photoelectric": True, "plc": False}
+    assert devices == {"camera": True, "encoder": True, "photoelectric": True, "plc": True}
     form = client.get("/api/devices/camera").json()
     assert "min_megapixels" in {f["name"] for f in form["fields"]}
-    assert client.get("/api/devices/plc").status_code == 404
+    assert client.get("/api/devices/hmi").status_code == 404
 
 
 # ---- creating a search ----
@@ -44,7 +44,7 @@ def test_invalid_criteria_returns_field_errors():
 
 
 def test_unsupported_device_is_rejected():
-    assert new_search(device="plc").status_code == 400
+    assert new_search(device="hmi").status_code == 400
 
 
 def test_unknown_search_is_404():

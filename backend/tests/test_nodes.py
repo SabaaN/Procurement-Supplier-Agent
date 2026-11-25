@@ -30,7 +30,7 @@ def test_parse_bad_value_routes_to_error():
 
 
 def test_parse_unsupported_device_routes_to_error():
-    s = start({}, device="plc")
+    s = start({}, device="hmi")
     assert "not supported" in s["error"]
     assert nodes.route_device(s) == "error"
 

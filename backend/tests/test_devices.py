@@ -42,12 +42,12 @@ def test_spec_allows_missing_fields():
 def test_registry():
     assert get_device("camera").key == "camera"
     with pytest.raises(UnsupportedDevice):
-        get_device("plc")
+        get_device("hmi")
 
 
 def test_dropdown_lists_live_and_coming_soon_devices():
     devices = {d["key"]: d["enabled"] for d in list_devices()}
-    assert devices == {"camera": True, "encoder": True, "photoelectric": True, "plc": False}
+    assert devices == {"camera": True, "encoder": True, "photoelectric": True, "plc": True}
 
 
 def test_form_fields_match_criteria_model():

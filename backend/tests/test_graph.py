@@ -31,5 +31,5 @@ def test_bad_input_stops_with_error():
 
 
 def test_unsupported_device_stops_with_error():
-    state, _ = run({}, device="plc")
+    state, _ = run({}, device="hmi")
     assert "not supported" in state["error"]

@@ -74,3 +74,13 @@ def voltage_range(low, high) -> tuple[float | None, float | None]:
     if lo is not None and hi is not None and lo > hi:
         lo, hi = hi, lo
     return lo, hi
+
+
+def frequency_khz(value) -> float | None:
+    """The highest frequency written, in kHz: '6 x 100 kHz' -> 100, '1 MHz' -> 1000, '60kHz (2 ch)' -> 60."""
+    s = str(value or "").lower()
+    best = None
+    for m in re.finditer(rf"{_NUM}\s*(mhz|khz|hz)\b", s):
+        khz = _to_float(m.group(1)) * {"mhz": 1000, "khz": 1, "hz": 0.001}[m.group(2)]
+        best = khz if best is None else max(best, khz)
+    return best if best and 0 < best <= 100_000 else None

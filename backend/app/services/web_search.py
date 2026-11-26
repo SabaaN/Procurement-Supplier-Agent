@@ -1,8 +1,11 @@
 """Web search through Tavily. Returns plain dicts so nodes and tests don't depend on the SDK."""
+import logging
 from functools import lru_cache
 from urllib.parse import urlsplit
 
 from ..config import settings
+
+log = logging.getLogger(__name__)
 
 
 class SearchError(RuntimeError):
@@ -18,15 +21,28 @@ def _client():
     return TavilyClient(settings.tavily_api_key)
 
 
-def search_web(query: str, max_results: int | None = None) -> list[dict]:
-    """One Tavily search. Each hit: url, title, snippet, score."""
+def search_web(query: str, max_results: int | None = None, country: str | None = None) -> list[dict]:
+    """One Tavily search. Each hit: url, title, snippet, score.
+    country (e.g. "pakistan") asks Tavily to prefer results from that country."""
+    kwargs = dict(
+        query=query,
+        max_results=max_results or settings.results_per_query,
+        search_depth="basic",
+        exclude_domains=list(settings.skip_domains),
+    )
+    if country:
+        kwargs["country"] = country
     try:
-        response = _client().search(
-            query=query,
-            max_results=max_results or settings.results_per_query,
-            search_depth="basic",
-            exclude_domains=list(settings.skip_domains),
-        )
+        try:
+            response = _client().search(**kwargs)
+        except TypeError:
+            if "country" not in kwargs:
+                raise
+            # an older tavily-python without the country option: search without it (the queries and the
+            # seller check still keep results to Pakistan)
+            log.warning("This tavily-python version has no country option; upgrade it for better local results")
+            kwargs.pop("country")
+            response = _client().search(**kwargs)
     except SearchError:
         raise
     except Exception as e:  # SDK raises its own error types; we only need one

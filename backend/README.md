@@ -89,3 +89,12 @@ Before a page goes to the model, `app/services/triage.py` skips the obvious ones
 blog, news, guide, company and policy pages (by their address), pages that never mention the device
 and show no price, and shop listings (many product links and prices), whose product links are followed
 directly. The progress panel counts them as "skipped without a model call". When unsure, the page is read.
+
+### Shipping time
+
+The results table shows a **Shipping time** column whenever at least one result has one, and the CSV always
+has it. It holds the delivery or lead time as the page writes it, e.g.
+"Delivery: 3-5 working days", "Ships in 2 weeks", "Lead time 4-6 weeks". It is read from the downloaded
+page in Python (`app/services/shipping.py`): no model call, no tokens. A product's own lead time is
+preferred over a store-wide delivery promise; return, refund and warranty periods are ignored. It is empty
+when the page states none, or when the site only works it out in the browser (e.g. from your location).

@@ -88,7 +88,7 @@ class CameraExtraction(BaseModel):
     colour: str | None = None
     scan_type: str | None = None
     sensor_format: str | None = None
-    interface: list[str] = []
+    interface: list[str] | None = None  # null allowed: models write null for 'none found'
     lens_mount: str | None = None
     bit_depth: int | None = None
     hardware_trigger: bool | None = None

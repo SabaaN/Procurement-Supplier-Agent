@@ -70,6 +70,7 @@ class ProductBase(BaseModel):
     contact_no: str | None = None
     product_link: str | None = None
     datasheet_url: str | None = None  # a PDF the supplier links from the product page
+    shipping_time: str | None = None  # as written on the page, e.g. "Delivery: 3-5 working days" (no model call)
     # filled in by the filter / score steps
     requirements_met: list[str] = []
     requirements_missed: list[str] = []

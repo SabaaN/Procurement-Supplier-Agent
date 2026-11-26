@@ -14,7 +14,7 @@ def fake_services(monkeypatch, tmp_path):
         n = 1 if attempt == 1 else 2
         return [f"query-{attempt}-{i}" for i in range(n)], "llm"
 
-    def fake_search(query, max_results=None):
+    def fake_search(query, max_results=None, country=None):
         # 3 unique pages per query
         return [
             {"url": f"https://example.com/{query}/{i}", "title": f"{query} #{i}", "snippet": "", "score": 1.0}

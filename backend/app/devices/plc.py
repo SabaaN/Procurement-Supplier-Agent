@@ -101,7 +101,7 @@ class PlcExtraction(BaseModel):
     analog_inputs: int | None = None
     analog_outputs: int | None = None
     supply: str | None = None  # as written: "24 V DC", "100-240 V AC"
-    communication: list[str] = []
+    communication: list[str] | None = None  # null allowed: models write null for 'none found'
     high_speed_counter: str | None = None  # as written, with its unit: "6 x 100 kHz"
     pulse_axes: int | None = None
     expandable: bool | None = None

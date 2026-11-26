@@ -183,6 +183,8 @@ def _extract_pages(device_key: str, pages: list[dict], label: str = "page") -> t
         if product is not None:
             # contacts and datasheet come from the page's links, so cached extractions get them too
             product = contacts.enrich(product, page.get("links"))
+            # read from today's download in Python, so cached readings get it too, without a model call
+            product = {**product, "shipping_time": (page.get("links") or {}).get("shipping")}
         out.append((page, kind, product))
     return out, counts, last_error, limited
 

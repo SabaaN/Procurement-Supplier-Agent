@@ -30,6 +30,12 @@ SYSTEM = (
 LOCAL_MARKET = {"PKR": "Pakistan", "AED": "UAE", "INR": "India", "GBP": "UK", "EUR": "Europe"}
 
 
+def _market(criteria: dict | None) -> str | None:
+    """Where the buyer shops: Pakistan when they asked for Pakistani sellers only, else from the currency."""
+    criteria = criteria or {}
+    return "Pakistan" if criteria.get("pakistan_only") else LOCAL_MARKET.get(criteria.get("currency", ""))
+
+
 def spec_items(device, criteria: dict) -> list[dict]:
     """The specs the buyer asked for, as readable items:
     {label, text (for the prompt), term (for template queries), required}."""
@@ -66,7 +72,8 @@ def fallback_queries(device, items: list[dict], attempt: int, criteria: dict | N
     """Template queries. Flexible specs are never in them (so nearby values are found too);
     later attempts drop must-have specs one by one to widen the search."""
     name = device.search_term or f"industrial {device.label.lower()}"
-    market = LOCAL_MARKET.get((criteria or {}).get("currency", ""))
+    market = _market(criteria)
+    pk_only = bool((criteria or {}).get("pakistan_only"))
     required = [i["term"] for i in items if i["level"] == "must" and i["term"]]
     nice = [i["term"] for i in items if i["level"] == "nice" and i["term"]]
     if attempt == 1:
@@ -77,9 +84,15 @@ def fallback_queries(device, items: list[dict], attempt: int, criteria: dict | N
         # Keep industrial machine vision prominent while opening the fallback to everyday cameras too.
         bases = ["machine vision camera", "industrial camera", "digital camera", "video camera"]
         queries = [f"{base} {terms} price" for base in bases]
-        if market:
+        if pk_only:  # every query names Pakistan
+            queries = [f"{base} {terms} price in Pakistan" for base in bases]
+        elif market:
             queries[0] = f"machine vision camera {terms} price in {market}"
         return [" ".join(q.split()) for q in queries[: settings.max_queries]]
+    if pk_only:
+        queries = [f"{name} {terms} price in Pakistan", f"{name} {terms} Karachi Lahore",
+                   f"{name} {terms} buy online Pakistan"]
+        return [" ".join(q.split()) for q in queries]
     queries = [f"{name} {terms} price", f"{name} {terms} buy online"]
     if market:
         queries.insert(0, f"{name} {terms} price in {market}")
@@ -91,7 +104,7 @@ def _prompt(device, items: list[dict], criteria: dict, attempt: int, previous) -
         return "\n".join(f"- {i['text']}" for i in items if i["level"] == level) or "- (none)"
 
     lo, hi = criteria.get("budget_min"), criteria.get("budget_max")
-    market = LOCAL_MARKET.get(criteria.get("currency", ""))
+    market = _market(criteria)
     parts = [
         f"Device: {device.label}",
         device.search_hint,
@@ -104,7 +117,11 @@ def _prompt(device, items: list[dict], criteria: dict, attempt: int, previous) -
     ]
     if criteria.get("notes"):
         parts.append(f"Buyer notes: {criteria['notes']}")
-    if market:
+    if criteria.get("pakistan_only"):
+        parts.append("Only sellers in Pakistan: EVERY query must find shops, distributors or vendors in Pakistan "
+                     "(e.g. end with 'price in Pakistan', or name Karachi, Lahore or Islamabad, or Pakistani "
+                     "marketplaces). Do not write queries that would find sellers in other countries.")
+    elif market:
         parts.append(f"The buyer is in {market}: make at least one query find shops selling there "
                      f"(e.g. ending in 'price in {market}').")
     if attempt == 1:

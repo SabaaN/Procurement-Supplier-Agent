@@ -73,7 +73,7 @@ def test_stream_replays_progress_and_can_resume():
 
 
 def test_failed_search_is_recorded(monkeypatch):
-    def down(query, max_results=None):
+    def down(query, max_results=None, country=None):
         raise web_search.SearchError("TAVILY_API_KEY is not set")
 
     monkeypatch.setattr(web_search, "search_web", down)

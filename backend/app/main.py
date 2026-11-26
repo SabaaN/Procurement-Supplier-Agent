@@ -167,7 +167,7 @@ def shortlist(search_id: str, req: ShortlistRequest):
 CORE_COLUMNS = [
     ("rank", "rank"), ("title", "title"),
     ("company_name", "Company name"), ("email", "Email"), ("contact_no", "Contact no"),
-    ("product_link", "Product link"), ("datasheet_url", "Datasheet (PDF)"),
+    ("product_link", "Product link"), ("datasheet_url", "Datasheet (PDF)"), ("shipping_time", "Shipping time"),
     ("supplier", "supplier"), ("part_number", "part_number"), ("price", "price"), ("currency", "currency"),
     ("price_buyer", "price_buyer"), ("total_cost", "total_cost"), ("match_score", "match_score"),
     ("requirements_met", "requirements_met"), ("requirements_close", "requirements_close"),

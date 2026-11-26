@@ -13,6 +13,8 @@ Anything else goes to the model as before. The rules are deliberately cautious: 
 import re
 from urllib.parse import urlsplit
 
+from . import pakistan
+
 # whole path segments that are never a product page
 _NOT_PRODUCT_PATH = re.compile(
     r"/(blog|blogs|news|article|articles|post|posts|forum|forums|wiki|tag|tags|author|press|careers|jobs|"
@@ -29,11 +31,13 @@ LISTING_MIN_LINKS = 8  # product links on the page
 LISTING_MIN_PRICES = 4  # separate prices shown
 
 
-def triage(device, page: dict) -> str | None:
-    """'not_product', 'listing', or None (send it to the model)."""
+def triage(device, page: dict, pakistan_only: bool = False) -> str | None:
+    """'not_product', 'not_pakistan', 'listing', or None (send it to the model)."""
     path = urlsplit(page.get("url", "")).path
     if _NOT_PRODUCT_PATH.search(path):
         return "not_product"
+    if pakistan_only and not pakistan.page_evidence(page):
+        return "not_pakistan"  # the buyer only wants sellers in Pakistan, and this page shows no sign of it
 
     links = page.get("links") or {}
     prices = links.get("prices") or {}

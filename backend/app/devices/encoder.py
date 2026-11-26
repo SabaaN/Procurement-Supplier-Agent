@@ -90,7 +90,7 @@ class EncoderExtraction(BaseModel):
     resolution_bits: int | None = None
     singleturn_steps: int | None = None  # e.g. 8192 positions per turn, when bits aren't given
     multiturn: bool | None = None
-    output: list[str] = []
+    output: list[str] | None = None  # null allowed: models write null for 'none found'
     shaft_type: str | None = None
     shaft_diameter_mm: float | None = None
     housing_diameter_mm: float | None = None

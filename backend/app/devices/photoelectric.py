@@ -87,7 +87,7 @@ class PhotoelectricExtraction(BaseModel):
     moq: int | None = None
     sensing_method: str | None = None
     sensing_range: str | None = None  # as written, with its unit: "0.1-2 m", "300 mm"
-    output: list[str] = []
+    output: list[str] | None = None  # null allowed: models write null for 'none found'
     switching_mode: str | None = None
     light_source: str | None = None
     housing: str | None = None

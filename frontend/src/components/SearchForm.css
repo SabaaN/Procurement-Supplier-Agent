@@ -12,6 +12,10 @@
 .form__device {
   display: grid;
   gap: var(--space-2);
+  max-width: 560px;
+}
+
+.form__device select {
   max-width: 280px;
 }
 
@@ -47,4 +51,10 @@
   margin-top: var(--space-3);
   width: fit-content;
   max-width: 100%;
+}
+
+.form__market {
+  width: fit-content;
+  max-width: 100%;
+  margin-top: var(--space-2);
 }

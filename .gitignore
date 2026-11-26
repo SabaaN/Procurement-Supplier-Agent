@@ -4,3 +4,5 @@ __pycache__/
 .pytest_cache/
 *.db
 notes.txt
+Add one more column (shipping time) if shipping time is mentioned on the product page
+

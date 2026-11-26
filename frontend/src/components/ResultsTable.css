@@ -126,6 +126,11 @@
   min-width: 8rem;
 }
 
+.cell--shipping {
+  min-width: 9rem;
+  font-size: var(--text-sm);
+}
+
 .cell--contact,
 .cell--link {
   overflow-wrap: anywhere;

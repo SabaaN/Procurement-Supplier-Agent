@@ -38,6 +38,8 @@ export default function ResultsTable({ search, results, onToggleShortlist }) {
 
   if (loading) return <section className="card muted">Loading results…</section>
 
+  const showShipping = products.some((p) => p.shipping_time)
+
   return (
     <section className="results">
       {error && (
@@ -101,6 +103,7 @@ export default function ResultsTable({ search, results, onToggleShortlist }) {
             </label>
           </div>
 
+          {/* shown only when at least one result states a shipping time (read from the page, no model call) */}
           <div className="card table-card">
             <table className="table">
               <thead>
@@ -126,6 +129,7 @@ export default function ResultsTable({ search, results, onToggleShortlist }) {
                   <th>Contact no</th>
                   <th>Product link</th>
                   <th>Datasheet</th>
+                  {showShipping && <th>Shipping time</th>}
                   <th>Key specs</th>
                 </tr>
               </thead>
@@ -135,6 +139,7 @@ export default function ResultsTable({ search, results, onToggleShortlist }) {
                     key={p.id}
                     product={p}
                     searchId={search.id}
+                    showShipping={showShipping}
                     deviceKey={search.device}
                     currency={currency}
                     quantity={quantity}

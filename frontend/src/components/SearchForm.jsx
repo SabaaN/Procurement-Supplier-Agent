@@ -13,6 +13,7 @@ export default function SearchForm({ onStarted }) {
   const [values, setValues] = useState({})
   const [levels, setLevels] = useState({})
   const [flexibleBudget, setFlexibleBudget] = useState(false)
+  const [pakistanOnly, setPakistanOnly] = useState(false)
   const [currency, setCurrency] = useState('PKR')
   const [notes, setNotes] = useState('')
   const [errors, setErrors] = useState({})
@@ -59,7 +60,15 @@ export default function SearchForm({ onStarted }) {
     setMessage(null)
     setSubmitting(true)
     try {
-      const criteria = buildCriteria({ fields: form.fields, values, levels, currency, notes, flexibleBudget })
+      const criteria = buildCriteria({
+        fields: form.fields,
+        values,
+        levels,
+        currency,
+        notes,
+        flexibleBudget,
+        pakistanOnly,
+      })
       const { id } = await createSearch(device, criteria)
             onStarted({ id, device, deviceLabel: form.label, fields: form.fields, criteria })
     } catch (err) {
@@ -98,6 +107,16 @@ export default function SearchForm({ onStarted }) {
             </option>
           ))}
         </select>
+        <label className="chip form__market">
+          <input type="checkbox" checked={pakistanOnly} onChange={(e) => setPakistanOnly(e.target.checked)} />
+          Search Pakistan market only
+        </label>
+        {pakistanOnly && (
+          <p className="field__help">
+            Only sellers that show they are in Pakistan: a{'\u00a0'}.pk website, a Pakistani phone number, a price in PKR
+            or an address in a Pakistani city.
+          </p>
+        )}
       </div>
 
       {!form && !message && <p className="muted">Loading form…</p>}

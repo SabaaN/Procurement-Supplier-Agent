@@ -44,7 +44,7 @@ function Meter({ value, tone }) {
   )
 }
 
-export default function ResultRow({ product: p, searchId, deviceKey, currency, quantity, onToggle }) {
+export default function ResultRow({ product: p, searchId, showShipping, deviceKey, currency, quantity, onToggle }) {
   const link = safeUrl(p.product_link || p.source_url)
   const mailto = mailtoUrl(p.email)
   const tel = telUrl(p.contact_no)
@@ -142,6 +142,12 @@ export default function ResultRow({ product: p, searchId, deviceKey, currency, q
       <td className="cell cell--datasheet" data-label="Datasheet">
         <DatasheetCell searchId={searchId} product={p} />
       </td>
+
+      {showShipping && (
+        <td className="cell cell--shipping" data-label="Shipping time">
+          {p.shipping_time || <span className="muted">—</span>}
+        </td>
+      )}
 
       <td className="cell cell--specs" data-label="Key specs">
         {specs.length ? specs.join(' · ') : <span className="muted">—</span>}

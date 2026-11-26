@@ -22,6 +22,15 @@ export const KEY_SPECS = {
     { key: 'housing', format: (v) => v },
     { key: 'response_time_ms', format: (v) => `${v} ms` },
   ],
+  plc: [
+    { key: 'brand', format: (v) => v },
+    { key: 'series', format: (v) => v },
+    { key: 'digital_inputs', format: (v) => `${v} DI` },
+    { key: 'digital_outputs', format: (v) => `${v} DO` },
+    { key: 'output_type', format: (v) => v.join(' / ') },
+    { key: 'supply', format: (v) => v.join(' / ') },
+    { key: 'communication', format: (v) => v.join(' / ') },
+  ],
 }
 
 /** The spec texts to show for one product, skipping anything the page didn't state. */

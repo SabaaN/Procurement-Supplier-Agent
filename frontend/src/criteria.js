@@ -2,7 +2,15 @@ const isEmpty = (v) =>
   v === undefined || v === '' || v === false || (Array.isArray(v) && v.length === 0)
 
 /** Form state -> the `criteria` object for POST /api/searches. Empty inputs are left out. */
-export function buildCriteria({ fields, values, levels = {}, currency, notes, flexibleBudget = false }) {
+export function buildCriteria({
+  fields,
+  values,
+  levels = {},
+  currency,
+  notes,
+  flexibleBudget = false,
+  pakistanOnly = false,
+}) {
   const criteria = { currency }
   if (notes.trim()) criteria.notes = notes.trim()
 
@@ -21,6 +29,7 @@ export function buildCriteria({ fields, values, levels = {}, currency, notes, fl
     }
   }
   if (flexibleBudget && criteria.budget_max !== undefined) criteria.flexible_budget = true
+  if (pakistanOnly) criteria.pakistan_only = true
   return criteria
 }
 
@@ -82,5 +91,6 @@ export function summarizeCriteria(criteria, fields) {
   }
   if (criteria.flexible_budget) chips[chips.length - 1] = { text: `${chips.at(-1).text} (flexible)`, flexible: true }
   if (quantity !== undefined) chips.push({ text: `Qty ${number(quantity)}`, required: false })
+  if (criteria.pakistan_only) chips.push({ text: 'Sellers in Pakistan only', required: true })
   return chips
 }

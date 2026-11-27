@@ -31,6 +31,14 @@ export const KEY_SPECS = {
     { key: 'supply', format: (v) => v.join(' / ') },
     { key: 'communication', format: (v) => v.join(' / ') },
   ],
+  qr_scanner: [
+    { key: 'scanner_type', format: (v) => v },
+    { key: 'codes', format: (v) => v.join(' / ') },
+    { key: 'reads_screens', format: (v) => (v ? 'reads screens' : 'no screen reading') },
+    { key: 'interface', format: (v) => v.join(' / ') },
+    { key: 'resolution_mil', format: (v) => `${v} mil` },
+    { key: 'ip_rating', format: (v) => `IP${v}` },
+  ],
 }
 
 /** The spec texts to show for one product, skipping anything the page didn't state. */

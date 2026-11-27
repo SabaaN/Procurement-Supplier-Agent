@@ -84,9 +84,11 @@ def test_a_model_comes_back_when_its_wait_is_over(two_models):
 
 
 def test_per_minute_limits_and_other_errors_are_not_treated_as_daily(two_models):
-    with pytest.raises(RateLimited):
-        llm.call("main", Answer, [], client_for={"main": Client(RateLimited(TPM)), "backup": Client()}.get)
-    assert "main" not in llm._exhausted
+    main, backup = Client(RateLimited(TPM)), Client()
+    assert llm.call("main", Answer, [], client_for={"main": main, "backup": backup}.get).ok  # the backup answers
+    assert "main" not in llm._exhausted and backup.calls == 1
+    with pytest.raises(ValueError):  # anything else is raised as it is
+        llm.call("main", Answer, [], client_for=lambda m: Client(ValueError("bad tool output")))
 
 
 def test_no_backup_when_turned_off(monkeypatch):

@@ -83,11 +83,20 @@ def search(state: SearchState) -> dict:
     hits = list(state.get("hits", []))
     known = set(urls)
     errors = []
-    for q in state.get("queries", []):
+    queries = state.get("queries", [])
+
+    def one(q):
         try:
-            results = web_search.search_web(q, country="pakistan" if pk_only else None)
+            return web_search.search_web(q, country="pakistan" if pk_only else None), None
         except web_search.SearchError as e:
-            errors.append(str(e))
+            return [], str(e)
+
+    # the queries run at the same time; their results are merged in query order, as before
+    with ThreadPoolExecutor(max_workers=max(1, len(queries))) as pool:
+        answers = list(pool.map(one, queries))
+    for q, (results, error) in zip(queries, answers):
+        if error:
+            errors.append(error)
             continue
         for r in results:
             if r["url"] not in known:

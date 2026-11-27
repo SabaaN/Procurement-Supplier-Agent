@@ -90,6 +90,23 @@ normalisation, checks, form fields) and register it in `app/devices/__init__.py`
 comparisons in `app/devices/compare.py`; the search, filter, ranking, form and CSV pick it up automatically.
 Add its key specs to `frontend/src/devices.js` for the results table.
 
+### Speed
+
+On Groq's free tier, each model may use 8,000 tokens a minute, and reading one page takes about
+3,000. That limit, not the code, sets how fast a search runs. To get the most out of it:
+
+- **Pacing** (`GROQ_TOKENS_PER_MINUTE`, default 8000): the tokens each model used in the last minute
+  are counted, and a call waits just long enough for room instead of hitting the limit and failing
+  the page. Set it to 0 on a paid plan.
+- **Both models** (`GROQ_SPREAD_MODELS`, default 1): when the main model has no room this minute,
+  the page goes to `GROQ_FALLBACK_MODEL`, which has its own allowance. That makes page reading about
+  twice as fast for the same number of tokens. The total for the day is shared across both models'
+  daily allowances. Set it to 0 to keep the backup only for when the main model's daily allowance
+  runs out.
+- **Searches and downloads**: the planned queries run on Tavily at the same time. Pages download
+  10 at a time (`FETCH_WORKERS`), a site gets 8 seconds to answer (`FETCH_TIMEOUT`) and robots.txt
+  gets 4 seconds.
+
 ### Saving model calls
 
 Before a page goes to the model, `app/services/triage.py` skips the obvious ones in plain Python:

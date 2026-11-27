@@ -9,6 +9,8 @@ PRODUCT_TEXT = "Stub product page for a camera / encoder / photoelectric sensor.
 @pytest.fixture(autouse=True)
 def fake_services(monkeypatch, tmp_path):
     llm.reset_limits()  # no model starts a test marked as out for the day
+    # no per-minute pacing: fake calls cost nothing, and a test must never sleep (test_pacing turns it on)
+    monkeypatch.setattr(llm.PACER, "limit", 0)
     def fake_plan(device_key, criteria, attempt, previous=()):
         # 1 query on the first attempt, 2 on later ones (broader)
         n = 1 if attempt == 1 else 2

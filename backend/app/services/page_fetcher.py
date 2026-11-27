@@ -129,7 +129,7 @@ def _robots_allowed(url: str, client: httpx.Client) -> bool:
     if origin not in _ROBOTS:
         parser = None
         try:
-            resp = client.get(f"{origin}/robots.txt")
+            resp = client.get(f"{origin}/robots.txt", timeout=settings.robots_timeout)
             if resp.status_code == 200:
                 parser = RobotFileParser()
                 parser.parse(resp.text.splitlines())

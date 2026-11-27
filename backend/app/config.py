@@ -22,8 +22,11 @@ class Settings:
     # new pages fetched per search attempt. Each one costs a Groq extraction call: lower this
     # if the progress panel shows many "failed" extractions (Groq rate limits on the free tier).
     max_pages_per_attempt: int = int(os.getenv("MAX_PAGES_PER_ATTEMPT", "12"))
-    fetch_workers: int = 5  # parallel downloads
-    fetch_timeout: float = 15.0  # seconds
+    fetch_workers: int = int(os.getenv("FETCH_WORKERS", "10"))  # parallel downloads
+    # seconds to wait for a site. A slow site holds up its whole batch, and few product pages that
+    # take longer than this to answer are worth the wait.
+    fetch_timeout: float = float(os.getenv("FETCH_TIMEOUT", "8"))
+    robots_timeout: float = 4.0  # robots.txt is small: a site that can't send it quickly is treated as allowing
     max_page_bytes: int = 2_000_000  # stop downloading a page after this
     # cleaned text sent to the model per page: about 1 token per 4 characters. Spec tables and the price
     # box are kept first, so most product pages need far less than this.
@@ -68,6 +71,13 @@ class Settings:
     # Used when a model hits its daily limit; it has its own allowance. "" turns the backup off.
     groq_fallback_model: str = os.getenv("GROQ_FALLBACK_MODEL", "openai/gpt-oss-120b")
     extract_retry_wait: float = 5.0  # seconds to wait before retrying a failed Groq call
+    # Groq's per-minute token limit for each model (free tier: 8,000). Calls wait for room under it
+    # instead of hitting it and failing. 0 turns the pacing off (e.g. on a paid plan).
+    groq_tokens_per_minute: int = int(os.getenv("GROQ_TOKENS_PER_MINUTE", "8000"))
+    # Use GROQ_FALLBACK_MODEL too whenever the main model is at its per-minute limit. Each model has its
+    # own per-minute allowance, so pages are read about twice as fast. 0: the backup is used only once
+    # the main model's daily allowance is gone.
+    groq_spread_models: bool = os.getenv("GROQ_SPREAD_MODELS", "1").lower() in ("1", "true", "yes")
     db_path: Path = BACKEND_DIR / "data" / "app.db"
 
 settings = Settings()

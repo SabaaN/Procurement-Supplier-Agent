@@ -73,8 +73,9 @@ def _invoke(device, url: str, title: str, text: str):
         except Exception as e:  # per-minute rate limit, bad tool output, network...
             last = e
             log.warning("Extraction attempt %d failed for %s: %s: %s", attempt + 1, url, type(e).__name__, e)
-            if attempt == 0:
-                time.sleep(llm.per_minute_wait(e) or settings.extract_retry_wait)
+            wait = llm.per_minute_wait(e)
+            if attempt == 0 and wait:  # a bad answer is retried right away; only a rate limit needs a pause
+                time.sleep(wait)
     raise ExtractionError(f"{type(last).__name__}: {last}") from last
 
 

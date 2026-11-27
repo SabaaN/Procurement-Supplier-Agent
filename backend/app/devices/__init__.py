@@ -4,8 +4,9 @@ from .camera import CAMERA
 from .encoder import ENCODER
 from .photoelectric import PHOTOELECTRIC
 from .plc import PLC
+from .qr_scanner import QR_SCANNER
 
-DEVICES: dict[str, DeviceDefinition] = {d.key: d for d in (CAMERA, ENCODER, PHOTOELECTRIC, PLC)}
+DEVICES: dict[str, DeviceDefinition] = {d.key: d for d in (CAMERA, ENCODER, PHOTOELECTRIC, PLC, QR_SCANNER)}
 
 # Shown in the dropdown but not selectable yet.
 COMING_SOON: dict[str, str] = {}

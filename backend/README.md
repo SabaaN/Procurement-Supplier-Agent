@@ -74,6 +74,13 @@ transistor sink / NPN, transistor source / PNP; "transistor" without sink or sou
 guessed), power supply, communication (all of the ports ticked), high-speed counter (kHz), pulse outputs
 (axes) and expandable. The brand and series (e.g. Siemens, S7-1200) are read and shown in results but are not search requirements.
 
+**QR code scanner**: 2D scanners that read QR codes (handheld, presentation / desktop, fixed mount, OEM
+scan engine). 1D-only laser or CCD barcode scanners, barcode printers, RFID readers, payment terminals and
+apps are skipped as "wrong kind of product". Specs: scanner type, codes it reads (all of the ones ticked:
+QR Code, Data Matrix, PDF417, Aztec, DotCode, MaxiCode, 1D barcodes), reads phone screens, interface (any of
+the ones ticked), finest code (a maximum, in mil: smaller reads smaller codes), reading distance (a minimum,
+in mm; "30 cm" on a page is converted) and IP rating.
+
 Encoder specs: encoder type, resolution (PPR for incremental, single-turn bits for absolute), multi-turn,
 output / interface, shaft type, shaft or bore diameter, housing diameter (a maximum: the space it must fit),
 your supply voltage (kept when it falls inside the encoder's range), max speed and IP rating.
@@ -98,3 +105,17 @@ has it. It holds the delivery or lead time as the page writes it, e.g.
 page in Python (`app/services/shipping.py`): no model call, no tokens. A product's own lead time is
 preferred over a store-wide delivery promise; return, refund and warranty periods are ignored. It is empty
 when the page states none, or when the site only works it out in the browser (e.g. from your location).
+
+### Search Pakistan market only
+
+Ticking **Search Pakistan market only** sends `"pakistan_only": true`. Then:
+
+- every search query targets sellers in Pakistan ("... price in Pakistan", Karachi, Lahore), and Tavily is
+  asked to prefer results from Pakistan (older tavily-python versions without that option still work);
+- a seller counts as Pakistani only when its page shows evidence, checked in Python (`app/services/pakistan.py`):
+  a .pk website, a Pakistani phone number (+92 / 03xx), a price in PKR (or "Rs" with no sign of India), or an
+  address in a Pakistani city. "We ship to Pakistan" does not count;
+- pages without that evidence are skipped before the model reads them, and products without it are dropped
+  ("No sign the seller is in Pakistan"); foreign sellers are never shown as closest matches.
+
+The CSV's **Seller in Pakistan** column lists the evidence found for each product.

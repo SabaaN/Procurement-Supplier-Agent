@@ -37,6 +37,7 @@ class SharedCriteria(BaseModel):
     currency: str = "PKR"
     quantity: int = Field(default=1, ge=1)
     flexible_budget: bool = False  # keep products a little over budget_max (BUDGET_TOLERANCE), flagged
+    pakistan_only: bool = False  # only sellers in Pakistan: searches target Pakistan, others are dropped
     notes: str = ""  # free text; the only input an LLM has to interpret
 
     @model_validator(mode="after")
@@ -70,6 +71,7 @@ class ProductBase(BaseModel):
     contact_no: str | None = None
     product_link: str | None = None
     datasheet_url: str | None = None  # a PDF the supplier links from the product page
+    pakistan_evidence: list[str] = []  # why the seller looks Pakistani (services/pakistan.py); empty: no sign
     shipping_time: str | None = None  # as written on the page, e.g. "Delivery: 3-5 working days" (no model call)
     # filled in by the filter / score steps
     requirements_met: list[str] = []

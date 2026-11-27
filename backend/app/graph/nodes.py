@@ -15,7 +15,7 @@ from .checks import check_product
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from ..config import settings
 from ..services import (
-    cache, contacts, extractor, fx, llm, page_fetcher, prices, query_planner, triage, web_search,
+    cache, contacts, extractor, fx, llm, page_fetcher, pakistan, prices, query_planner, triage, web_search,
 )
 from . import scoring
 
@@ -78,13 +78,14 @@ def plan_queries(state: SearchState) -> dict:
 
 def search(state: SearchState) -> dict:
     """Run each planned query on Tavily; keep only URLs we haven't seen in earlier attempts."""
+    pk_only = bool((state.get("criteria") or {}).get("pakistan_only"))
     urls = list(state.get("urls", []))
     hits = list(state.get("hits", []))
     known = set(urls)
     errors = []
     for q in state.get("queries", []):
         try:
-            results = web_search.search_web(q)
+            results = web_search.search_web(q, country="pakistan" if pk_only else None)
         except web_search.SearchError as e:
             errors.append(str(e))
             continue
@@ -142,7 +143,8 @@ def fetch_clean(state: SearchState) -> dict:
     return {"pages": pages + new}
 
 
-def _extract_pages(device_key: str, pages: list[dict], label: str = "page") -> tuple[list, Counter, str, str | None]:
+def _extract_pages(device_key: str, pages: list[dict], label: str = "page",
+                   pakistan_only: bool = False) -> tuple[list, Counter, str, str | None]:
     """Run (or reuse cached) extraction on each page.
     Returns ([(page, kind, product)], kind counts, last error, daily-limit message or None).
     Obvious non-product pages and shop listings are recognised in Python first, without a model call.
@@ -153,11 +155,11 @@ def _extract_pages(device_key: str, pages: list[dict], label: str = "page") -> t
     for i, page in enumerate(pages, 1):
         emit("extract", "running", f"Extracting specs from {label} {i} of {len(pages)}", done=i, total=len(pages))
         cached = cache.get_extraction(page["url"], key, settings.extraction_cache_hours)
-        obvious = None if cached is not None else triage.triage(device, page)
+        obvious = None if cached is not None else triage.triage(device, page, pakistan_only)
         if cached is not None:
             kind, product = cached["kind"], cached["product"]
-        elif obvious == "not_product":
-            counts["skipped"] += 1
+        elif obvious in ("not_product", "not_pakistan"):
+            counts["skipped" if obvious == "not_product" else "not_pakistan"] += 1
             continue
         elif obvious == "listing":
             kind, product = "listing", None  # its product links are followed without reading it
@@ -184,7 +186,8 @@ def _extract_pages(device_key: str, pages: list[dict], label: str = "page") -> t
             # contacts and datasheet come from the page's links, so cached extractions get them too
             product = contacts.enrich(product, page.get("links"))
             # read from today's download in Python, so cached readings get it too, without a model call
-            product = {**product, "shipping_time": (page.get("links") or {}).get("shipping")}
+            product = {**product, "shipping_time": (page.get("links") or {}).get("shipping"),
+                       "pakistan_evidence": pakistan.page_evidence(page, product.get("currency"))}
         out.append((page, kind, product))
     return out, counts, last_error, limited
 
@@ -202,7 +205,8 @@ def _listing_links(results: list, known: set[str]) -> list[str]:
 
 def _kind_summary(counts: Counter) -> str:
     names = [("listing", "listing pages"), ("wrong_type", "wrong kind of product"),
-             ("other", "not product pages"), ("skipped", "skipped without a model call"), ("failed", "failed"),
+             ("other", "not product pages"), ("skipped", "skipped without a model call"),
+             ("not_pakistan", "skipped: seller not in Pakistan"), ("failed", "failed"),
              ("not_read", "not read: daily limit")]
     return ", ".join(f"{counts[k]} {name}" for k, name in names if counts[k]) or "nothing else"
 
@@ -213,7 +217,8 @@ def extract(state: SearchState) -> dict:
     device_key = state["device_type"]
     pages = list(state["pages"])
     ok_pages = [p for p in pages if p["ok"]]  # skip pages that failed to download
-    results, counts, last_error, limited = _extract_pages(device_key, ok_pages)
+    pk_only = bool((state.get("criteria") or {}).get("pakistan_only"))
+    results, counts, last_error, limited = _extract_pages(device_key, ok_pages, pakistan_only=pk_only)
 
     if ok_pages and not limited and counts["failed"] == len(ok_pages):  # the model never worked: stop instead of looping
         emit("extract", "failed", f"Extraction failed: {last_error}")
@@ -227,7 +232,8 @@ def extract(state: SearchState) -> dict:
         followed = _fetch(follow, titles, label="product links")
         pages += followed
         urls += follow
-        more, more_counts, _, limited = _extract_pages(device_key, [p for p in followed if p["ok"]], label="linked page")
+        more, more_counts, _, limited = _extract_pages(device_key, [p for p in followed if p["ok"]],
+                                                       label="linked page", pakistan_only=pk_only)
         results += more
         counts.update(more_counts)
 
@@ -311,6 +317,8 @@ def filter_products(state: SearchState) -> dict:
         verdict = check_product(c, p, checks=device.checks, units=device.units,
                                 strict=settings.strict_requirements, tolerance=settings.flexible_tolerance)
         reasons += verdict["dropped_for"]
+        if c.get("pakistan_only") and not p.get("pakistan_evidence"):
+            reasons.append(NOT_IN_PAKISTAN)
         flags += [f"{label}: not found on page" for label in verdict["unknown"]]
         product = {
             **p,
@@ -355,6 +363,9 @@ def route_after_filter(state: SearchState) -> str:
 NEAR_MISS_PENALTY = 15  # match points removed per miss, so a closest match never looks like a full one
 
 
+NOT_IN_PAKISTAN = "No sign the seller is in Pakistan"
+
+
 def closest_matches(dropped: list[dict], n: int) -> list[dict]:
     """The n dropped products that came nearest, each marked near_miss with what it misses."""
     nearest = sorted(dropped, key=lambda d: d.get("distance", len(d["reasons"])))[:n]
@@ -366,7 +377,9 @@ def score(state: SearchState) -> dict:
     If nothing matched fully, the closest products are scored and returned instead, marked near_miss."""
     candidates = state["candidates"]
     if not candidates and state.get("dropped") and settings.closest_matches > 0:
-        candidates = closest_matches(state["dropped"], settings.closest_matches)
+        # with "Pakistan market only", a foreign seller is never offered as a closest match
+        pool = [d for d in state["dropped"] if NOT_IN_PAKISTAN not in d["reasons"]]
+        candidates = closest_matches(pool, settings.closest_matches)
         if candidates:
             emit("rank", "running", f"No exact matches: showing the {len(candidates)} closest")
     checks = get_device(state.get("device_type") or "camera").checks

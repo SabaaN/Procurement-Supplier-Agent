@@ -18,7 +18,7 @@ def new_search(criteria=CRIT, device="camera"):
 
 def test_devices_endpoints():
     devices = {d["key"]: d["enabled"] for d in client.get("/api/devices").json()}
-    assert devices == {"camera": True, "encoder": True, "photoelectric": True, "plc": True}
+    assert devices == {"camera": True, "encoder": True, "photoelectric": True, "plc": True, "qr_scanner": True}
     form = client.get("/api/devices/camera").json()
     assert "min_megapixels" in {f["name"] for f in form["fields"]}
     assert client.get("/api/devices/hmi").status_code == 404

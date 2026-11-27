@@ -84,3 +84,10 @@ def frequency_khz(value) -> float | None:
         khz = _to_float(m.group(1)) * {"mhz": 1000, "khz": 1, "hz": 0.001}[m.group(2)]
         best = khz if best is None else max(best, khz)
     return best if best and 0 < best <= 100_000 else None
+
+
+def code_size_mil(value) -> float | None:
+    """The finest (smallest) code size written, in mil: '≥3 mil (1D), 5 mil (2D)' -> 3, '4mil' -> 4."""
+    sizes = [_to_float(m.group(1)) for m in re.finditer(rf"{_NUM}\s*mils?\b", str(value or "").lower())]
+    sizes = [s for s in sizes if 0 < s <= 100]
+    return min(sizes) if sizes else None

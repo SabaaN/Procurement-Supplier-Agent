@@ -47,7 +47,7 @@ def test_registry():
 
 def test_dropdown_lists_live_and_coming_soon_devices():
     devices = {d["key"]: d["enabled"] for d in list_devices()}
-    assert devices == {"camera": True, "encoder": True, "photoelectric": True, "plc": True}
+    assert devices == {"camera": True, "encoder": True, "photoelectric": True, "plc": True, "qr_scanner": True}
 
 
 def test_form_fields_match_criteria_model():
